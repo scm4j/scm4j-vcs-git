@@ -141,6 +141,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 	}
 
 	public Git getLocalGit(VCSWorkspace workspace) {
+		
 		Repository repo;
 		try {
 			repo = new FileRepositoryBuilder()
@@ -288,34 +289,23 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			try {
 				try (Git git = getLocalGit(workspace)) {
 					
-					checkout(branchName, git);
+					git
+							.pull()
+							.setCredentialsProvider(credentials)
+							.call();
 					
-					Repository repository = git.getRepository();
-					// find the HEAD
-					ObjectId lastCommitId = repository.resolve(Constants.HEAD);
-					// now we have to get the commit
-					RevCommit commit;
-					try (RevWalk revWalk = new RevWalk(repository)) {
-						commit = revWalk.parseCommit(lastCommitId);
-					}
-					// and using commit's tree find the path
-					RevTree tree = commit.getTree();
-					ObjectId objectId;
-					try (TreeWalk treeWalk = new TreeWalk(repository)) {
-						treeWalk.addTree(tree);
-						treeWalk.setRecursive(true);
-						treeWalk.setFilter(PathFilter.create(filePath));
-						if (!treeWalk.next()) {
-							return null;
-						}
-						objectId = treeWalk.getObjectId(0);
-					}
-					ObjectLoader loader = repository.open(objectId);
-
-					InputStream in = loader.openStream();
-					String res = IOUtils.toString(in, encoding);
+					git
+							.checkout()
+							.setCreateBranch(false)
+							.setForce(true)
+							.addPath(filePath)
+							.setName(branchName)
+							//.setStartPoint("origin/" + destBranchUrl)
+							//.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
+							.call();
+					File file = new File(workspace.getFolder(), filePath);
 					
-					return res;
+					return IOUtils.toString(file.toURI(), encoding);
 				}
 							
 			} finally {
@@ -335,7 +325,20 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			try {
 				try (Git git = getLocalGit(workspace)) {
 					
-					checkout(branchName, git);
+					git
+							.pull()
+							.setCredentialsProvider(credentials)
+							.call();
+			
+					git
+							.checkout()
+							.setCreateBranch(false)
+							.setForce(true)
+							.addPath(filePath)
+							.setName(branchName)
+							//.setStartPoint("origin/" + destBranchUrl)
+							//.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
+							.call();
 					
 					File file = new File(workspace.getFolder(), filePath);
 					FileWriter fw = new FileWriter(file, false);
@@ -344,15 +347,14 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					
 					git
 							.commit()
+							.setOnly(filePath)
 							.setMessage(commitMessage)
-							.setAll(true)
 							.call();
 					
-					RefSpec refSpec = new RefSpec( ":refs/heads/" + branchName);
+					RefSpec refSpec = new RefSpec(branchName + ":" + branchName);
 					
 					git
 							.push()
-							.setPushAll()
 							.setForce(true)
 							.setRefSpecs(refSpec)
 							.setRemote("origin")
@@ -363,12 +365,12 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			} finally {
 				workspace.unlock();
 			}
+			
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		
 	}
 
 	@Override

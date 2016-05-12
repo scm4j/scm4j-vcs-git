@@ -1,11 +1,13 @@
 package com.projectkaiser.scm.vcs;
 
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -14,6 +16,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.transport.RefSpec;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -36,10 +39,13 @@ public class GitVCSTest  {
 	private static final String SRC_BRANCH = "master";
 	private static final String INITIAL_COMMIT_MESSAGE = "Initial commit";
 	private static final String CREATED_DST_BRANCH_COMMIT_MESSAGE = "created dst branch";
+	private static final String CONTENT_CHANGED_COMMIT_MESSAGE = "changed file content";
 	private static final String MERGE_COMMIT_MESSAGE = "merged.";
 	private static final String DELETE_BRANCH_COMMIT_MESSAGE = "deleted";
 	private static final String PROXY_HOST = "localhost";
 	private static final Integer PROXY_PORT = 3128;
+	private static final String LINE_1 = "line 1";
+	private static final String LINE_2 = "line 2";
 	
 	private IVCS vcs;
 	private GitHub github;
@@ -99,6 +105,48 @@ public class GitVCSTest  {
 	}
 	
 	@Test
+	public void testGetSetFileContent() throws NoFilepatternException, GitAPIException, IOException {
+		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
+		try {
+			try (Git git = gitVCS.getLocalGit(w)) {
+				File file = new File(w.getFolder(), "folder/file1.txt");
+				file.getParentFile().mkdirs();
+				file.createNewFile();
+				PrintWriter out = new PrintWriter(file);
+				out.println(LINE_1);
+				out.close();
+
+				git
+						.add()
+						.addFilepattern("folder/file1.txt")
+						.call();
+				
+				git
+						.commit()
+						.setMessage(FILE1_ADDED_COMMIT_MESSAGE)
+						.call();
+				
+				RefSpec spec = new RefSpec("master:master");
+				git
+						.push()
+						.setRefSpecs(spec)
+						.setForce(true)
+						.setRemote("origin")
+						.setCredentialsProvider(gitVCS.getCredentials())
+						.call();
+				
+				vcs.setFileContent("master", "folder/file1.txt", LINE_2, CONTENT_CHANGED_COMMIT_MESSAGE);
+				
+				assertEquals(vcs.getFileContent("master", "folder/file1.txt"), LINE_2);
+				assertEquals(vcs.getFileContent("master", "folder/file1.txt", "UTF-8"), LINE_2);
+				
+			}
+		} finally {
+			w.unlock();
+		}
+	}
+	
+	@Test
 	public void testGitMerge() throws IOException, NoFilepatternException, GitAPIException, InterruptedException {
 		vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
 		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
@@ -141,7 +189,7 @@ public class GitVCSTest  {
 				git
 						.push()
 						.setPushAll()
-						.setForce(true)
+						//.setForce(true)
 						.setRemote("origin")
 						.setCredentialsProvider(gitVCS.getCredentials())
 						.call();
