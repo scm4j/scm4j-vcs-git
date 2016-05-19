@@ -11,7 +11,6 @@ import java.io.PrintWriter;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import org.eclipse.jgit.api.CreateBranchCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -152,6 +151,14 @@ public class GitVCSTest  {
 		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
 		try {
 			try (Git git = gitVCS.getLocalGit(w)) {
+				
+				git
+						.checkout()
+						.setCreateBranch(true)
+						.setStartPoint("refs/remotes/origin/" + SRC_BRANCH)
+						.setName(SRC_BRANCH)
+						.call(); // switch to master
+				
 				File file1 = new File(w.getFolder(), "file1.txt");
 				file1.createNewFile();
 
@@ -159,37 +166,35 @@ public class GitVCSTest  {
 						.add()
 						.addFilepattern("file1.txt")
 						.call();
+				
 				git
 						.commit()
 						.setMessage(FILE1_ADDED_COMMIT_MESSAGE)
 						.call();
 				
 				git
+				
 						.checkout()
 						.setCreateBranch(false)
-						
-						.setName(NEW_BRANCH) // create NEW_BRANCH locally
-						.setForce(true)
-						//.setStartPoint()
-						.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
+						.setName(NEW_BRANCH) 
 						.call(); // switch to new-branch
 				
 				File file2 = new File(w.getFolder(), "file2.txt");
 				file2.createNewFile();
+				
 				git
 						.add()
 						.addFilepattern("file2.txt")
 						.call();
+				
 				git
 						.commit()
 						.setMessage(FILE2_ADDED_COMMIT_MESSAGE)
 						.call();
 				
-				
 				git
 						.push()
 						.setPushAll()
-						//.setForce(true)
 						.setRemote("origin")
 						.setCredentialsProvider(gitVCS.getCredentials())
 						.call();
@@ -197,10 +202,8 @@ public class GitVCSTest  {
 				git
 						.checkout()
 						.setCreateBranch(false)
-						.setForce(true)
+						.setForce(false)
 						.setName(SRC_BRANCH)
-						//.setStartPoint("origin/" + SRC_BRANCH)
-						.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
 						.call(); // switch to master
 				
 				vcs.merge(NEW_BRANCH, SRC_BRANCH, MERGE_COMMIT_MESSAGE);
@@ -213,6 +216,7 @@ public class GitVCSTest  {
 				
 				assertTrue(file1.exists());
 				assertTrue(file2.exists());
+				
 				Iterable<RevCommit> commits = git
 						.log()
 						.all()

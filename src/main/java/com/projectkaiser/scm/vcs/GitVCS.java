@@ -3,7 +3,6 @@ package com.projectkaiser.scm.vcs;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Proxy.Type;
@@ -21,19 +20,11 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 import com.projectkaiser.scm.vcs.api.AbstractVCS;
 import com.projectkaiser.scm.vcs.api.IVCS;
@@ -69,7 +60,6 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					git
 							.branchCreate()
 							.setName(newBranchName)
-							.setForce(true)
 							.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
 							.setStartPoint("origin/" + srcBranchName)
 							.call();
@@ -107,7 +97,6 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					git
 							.branchDelete()
 							.setBranchNames(branchName)
-							.setForce(true)
 							.call();
 
 					git
@@ -121,7 +110,6 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					git
 							.push()
 							.setPushAll()
-							.setForce(true)
 							.setRefSpecs(refSpec)
 							.setRemote("origin")
 							.setCredentialsProvider(credentials)
@@ -160,8 +148,6 @@ public class GitVCS extends AbstractVCS implements IVCS {
 						.setDirectory(workspace.getFolder())
 						.setURI(baseUrl)
 						.setCredentialsProvider(credentials)
-						.setBranch("refs/heads/master")
-						//.setCloneAllBranches(true)
 						.setNoCheckout(true)
 						.call();
 			} catch (GitAPIException e) {
@@ -211,7 +197,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 									.setMode(ResetType.HARD)
 									.call();
 						} catch(Exception e) {
-							workspace.setIsCorrupt(true);
+							workspace.setCorrupt(true);
 						}
 					} else {
 						git
@@ -239,10 +225,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 		git
 				.checkout()
 				.setCreateBranch(false)
-				.setForce(true)
 				.setName(destBranchUrl)
-				//.setStartPoint("origin/" + destBranchUrl)
-				.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
 				.call(); 
 	}
 	
@@ -297,11 +280,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					git
 							.checkout()
 							.setCreateBranch(false)
-							.setForce(true)
 							.addPath(filePath)
 							.setName(branchName)
-							//.setStartPoint("origin/" + destBranchUrl)
-							//.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
 							.call();
 					File file = new File(workspace.getFolder(), filePath);
 					
@@ -333,11 +313,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					git
 							.checkout()
 							.setCreateBranch(false)
-							.setForce(true)
 							.addPath(filePath)
 							.setName(branchName)
-							//.setStartPoint("origin/" + destBranchUrl)
-							//.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
 							.call();
 					
 					File file = new File(workspace.getFolder(), filePath);
@@ -355,7 +332,6 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					
 					git
 							.push()
-							.setForce(true)
 							.setRefSpecs(refSpec)
 							.setRemote("origin")
 							.setCredentialsProvider(credentials)
