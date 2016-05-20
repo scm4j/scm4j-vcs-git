@@ -20,6 +20,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
@@ -30,6 +31,7 @@ import com.projectkaiser.scm.vcs.api.AbstractVCS;
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
 import com.projectkaiser.scm.vcs.api.VCSWorkspace;
+import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSException;
 
 public class GitVCS extends AbstractVCS implements IVCS {
@@ -75,6 +77,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			} finally {
 				workspace.unlock();
 			}
+		} catch (RefAlreadyExistsException e) {
+			throw new EVCSBranchExists (e);
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {

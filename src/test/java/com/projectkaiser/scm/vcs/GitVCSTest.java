@@ -25,6 +25,7 @@ import org.kohsuke.github.GitHub;
 
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.VCSWorkspace;
+import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 
 public class GitVCSTest  {
 	
@@ -32,8 +33,10 @@ public class GitVCSTest  {
 	private static final String FILE2_ADDED_COMMIT_MESSAGE = "file2 added";
 	private static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "pk-vcs-workspaces";
 	private static final String REPO_NAME = "pk-vcs-git-testrepo";
-	private static final String GITHUB_USER = System.getenv("PK_VCS_TEST_GITHUB_USER");
-	private static final String GITHUB_PASS = System.getenv("PK_VCS_TEST_GITHUB_PASS");
+	private static final String GITHUB_USER = System.getProperty("PK_VCS_TEST_GITHUB_USER") == null ? 
+			System.getenv("PK_VCS_TEST_GITHUB_USER") : System.getProperty("PK_VCS_TEST_GITHUB_USER");
+	private static final String GITHUB_PASS = System.getProperty("PK_VCS_TEST_GITHUB_PASS") == null ? 
+			System.getenv("PK_VCS_TEST_GITHUB_PASS") : System.getProperty("PK_VCS_TEST_GITHUB_PASS");
 	private static final String NEW_BRANCH = "new-branch";
 	private static final String SRC_BRANCH = "master";
 	private static final String INITIAL_COMMIT_MESSAGE = "Initial commit";
@@ -41,8 +44,11 @@ public class GitVCSTest  {
 	private static final String CONTENT_CHANGED_COMMIT_MESSAGE = "changed file content";
 	private static final String MERGE_COMMIT_MESSAGE = "merged.";
 	private static final String DELETE_BRANCH_COMMIT_MESSAGE = "deleted";
-	private static final String PROXY_HOST = "localhost";
-	private static final Integer PROXY_PORT = 3128;
+	private static final String PROXY_HOST = getJvmProperty("https.proxyHost");
+	private static final Integer PROXY_PORT = getJvmProperty("https.proxyPort") == null ? null :
+			Integer.parseInt(getJvmProperty("https.proxyPort"));
+	private static final String PROXY_USER = getJvmProperty("https.proxyUser");
+	private static final String PROXY_PASS = getJvmProperty("https.proxyPassword");
 	private static final String LINE_1 = "line 1";
 	private static final String LINE_2 = "line 2";
 	
@@ -64,12 +70,37 @@ public class GitVCSTest  {
 				GITHUB_PASS != null);
 	}
 	
+	private static String getJvmProperty(String name) {
+		if (name == null) {
+			return null;
+		}
+		
+		String res = System.getProperty(name);
+		if (res != null) {
+			return res;
+		}
+		
+		res = System.getenv("JAVA_OPTS");
+		if (res == null) {
+			return null;
+		}
+		
+		Integer st = res.indexOf(name);
+		if (st < 0) {
+			return null;
+		}
+		
+		res = res.substring(st + name.length() + 1, res.indexOf(" -D", st + name.length() + 1) < 0 ? name.length() : 
+				res.indexOf(" -D", st + name.length())).trim();
+		return res;
+	}
+	
 	@Before
 	public void setUp() throws IOException {
 		github = GitHub.connectUsingPassword(GITHUB_USER, GITHUB_PASS);
 		String uuid = UUID.randomUUID().toString();
 		repoName = (REPO_NAME + "_" + uuid);
-		
+		 
 		repo = github.createRepository(repoName)
 				.issues(false)
 				.wiki(false)
@@ -79,7 +110,9 @@ public class GitVCSTest  {
 		gitVCS = new GitVCS(null, WORKSPACE_DIR, gitUrl + repoName + ".git");
 		vcs = gitVCS;
 		vcs.setCredentials(GITHUB_USER, GITHUB_PASS);
-		vcs.setProxy(PROXY_HOST, PROXY_PORT, "", "");
+		if (PROXY_HOST != null) {
+			vcs.setProxy(PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS);
+		}
 	}
 	
 	@After
@@ -97,6 +130,12 @@ public class GitVCSTest  {
 		Thread.sleep(2000); // next operation fails time to time. Looks like github has some latency on branch operations
 		assertTrue(repo.getBranches().containsKey(NEW_BRANCH));
 		assertTrue(repo.getBranches().size() == 2); // master & NEW_BRANCH
+		
+		try {
+			vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
+			fail("\"Branch exists\" situation not detected");
+		} catch (EVCSBranchExists e) {
+		}
 		
 		vcs.deleteBranch(NEW_BRANCH, DELETE_BRANCH_COMMIT_MESSAGE);
 		Thread.sleep(2000); // next operation fails from time to time. Looks like github has some latency on branch operations
