@@ -15,7 +15,6 @@ import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
-import org.eclipse.jgit.api.CreateBranchCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
@@ -60,10 +59,15 @@ public class GitVCS extends AbstractVCS implements IVCS {
 				try (Git git = getLocalGit(workspace)) {
 					
 					git
+							.checkout()
+							.setCreateBranch(true)
+							.setStartPoint("origin/" + srcBranchName)
+							.setName(srcBranchName)
+							.call(); // switch to master
+					
+					git
 							.branchCreate()
 							.setName(newBranchName)
-							.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.SET_UPSTREAM)
-							.setStartPoint("origin/" + srcBranchName)
 							.call();
 					
 					RefSpec refSpec = new RefSpec().setSourceDestination(newBranchName, 
@@ -73,6 +77,12 @@ public class GitVCS extends AbstractVCS implements IVCS {
 							.setRefSpecs(refSpec)
 							.setCredentialsProvider(credentials)
 							.call();
+					
+					git
+							.branchDelete()
+							.setBranchNames(newBranchName)
+							.call();
+					
 				}
 			} finally {
 				workspace.unlock();
@@ -187,13 +197,13 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			
 					PKVCSMergeResult res = new PKVCSMergeResult();
 					
-					res.setIsSuccess(!mr.getMergeStatus().equals(MergeResult.MergeStatus.CONFLICTING) &&
+					res.setSuccess(!mr.getMergeStatus().equals(MergeResult.MergeStatus.CONFLICTING) &&
 							!mr.getMergeStatus().equals(MergeResult.MergeStatus.FAILED) && 
 							!mr.getMergeStatus().equals(MergeResult.MergeStatus.ABORTED) &&
 							!mr.getMergeStatus().equals(MergeResult.MergeStatus.NOT_SUPPORTED));
 					
 					
-					if (!res.getIsSuccess()) {
+					if (!res.getSuccess()) {
 						res.getConflictingFiles().addAll(mr.getConflicts().keySet());
 						try {
 							git

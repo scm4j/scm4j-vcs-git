@@ -1,16 +1,16 @@
 package com.projectkaiser.scm.vcs;
 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import org.eclipse.jgit.api.CreateBranchCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -24,13 +24,16 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 
 import com.projectkaiser.scm.vcs.api.IVCS;
+import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
 import com.projectkaiser.scm.vcs.api.VCSWorkspace;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 
 public class GitVCSTest  {
 	
-	private static final String FILE1_ADDED_COMMIT_MESSAGE = "file1 added";
-	private static final String FILE2_ADDED_COMMIT_MESSAGE = "file2 added";
+	private static final String FILE1_ADDED_COMMIT_MESSAGE = "test-master added";
+	private static final String FILE2_ADDED_COMMIT_MESSAGE = "test-branch added";
+	private static final String FILE1_CHANGED_COMMIT_MESSAGE = "test-master changed";
+	private static final String FILE2_CHANGED_COMMIT_MESSAGE = "test-branch changed";
 	private static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "pk-vcs-workspaces";
 	private static final String REPO_NAME = "pk-vcs-git-testrepo";
 	private static final String GITHUB_USER = System.getProperty("PK_VCS_TEST_GITHUB_USER") == null ? 
@@ -51,6 +54,10 @@ public class GitVCSTest  {
 	private static final String PROXY_PASS = getJvmProperty("https.proxyPassword");
 	private static final String LINE_1 = "line 1";
 	private static final String LINE_2 = "line 2";
+	private static final String LINE_3 = "line 3";
+	private static final String LINE_4 = "line 4";
+	private static final String FILE1_NAME = "test-master.txt";
+	private static final String FILE2_NAME = "test-branch.txt";
 	
 	private IVCS vcs;
 	private GitHub github;
@@ -185,6 +192,82 @@ public class GitVCSTest  {
 	}
 	
 	@Test
+	public void testGitMergeConflict() throws IOException, NoFilepatternException, GitAPIException, InterruptedException {
+		repo.createContent(LINE_1.getBytes(), FILE1_ADDED_COMMIT_MESSAGE, FILE1_NAME, SRC_BRANCH);
+		vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
+		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
+		try {
+			try (Git git = gitVCS.getLocalGit(w)) {
+				
+				git
+						.checkout()
+						.setCreateBranch(false)
+						.setName(SRC_BRANCH)
+						.call(); // switch to master
+				
+				git
+						.pull()
+						.setCredentialsProvider(gitVCS.getCredentials())
+						.call();
+				
+				File file = new File(w.getFolder(), FILE1_NAME);
+				FileWriter writer = new FileWriter(file, false);
+				writer.write(LINE_3);
+				writer.close();
+				
+				git
+						.commit()
+						.setAll(true)
+						.setMessage(FILE1_CHANGED_COMMIT_MESSAGE)
+						.call();
+				
+				git
+						.checkout()
+						.setCreateBranch(true)
+						.setStartPoint("origin/" + NEW_BRANCH)
+						.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.TRACK)
+						.setName(NEW_BRANCH)
+						.call(); // switch to new-branch and track origin/new-branch
+				                 // note: local new-branch was deleted at gitVCS.createBranch(). 
+								 // If not delete then new-branch will exist without tracking origin/new-branch 
+				
+				file = new File(w.getFolder(), FILE1_NAME);
+				writer = new FileWriter(file, false);
+				writer.write(LINE_4);
+				writer.close();
+				
+				git
+						.commit()
+						.setAll(true)
+						.setMessage(FILE2_CHANGED_COMMIT_MESSAGE)
+						.call();
+				
+				git
+						.checkout()
+						.setCreateBranch(false)
+						.setName(SRC_BRANCH)
+						.call(); // switch to master
+				
+				git
+						.push()
+						.setPushAll()
+						.setRemote("origin")
+						.setCredentialsProvider(gitVCS.getCredentials())
+						.call();
+
+				
+				PKVCSMergeResult res = vcs.merge(NEW_BRANCH, SRC_BRANCH, MERGE_COMMIT_MESSAGE);
+				
+				assertFalse(res.getSuccess());
+				assertTrue(res.getConflictingFiles().size() == 1);
+				assertTrue(res.getConflictingFiles().contains(file.getName()));
+			}
+		} finally {
+			w.unlock();
+		}
+	}
+	
+	@Test
 	public void testGitMerge() throws IOException, NoFilepatternException, GitAPIException, InterruptedException {
 		vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
 		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
@@ -193,68 +276,22 @@ public class GitVCSTest  {
 				
 				git
 						.checkout()
-						.setCreateBranch(true)
-						.setStartPoint("refs/remotes/origin/" + SRC_BRANCH)
+						.setCreateBranch(false)
 						.setName(SRC_BRANCH)
 						.call(); // switch to master
 				
-				File file1 = new File(w.getFolder(), "file1.txt");
-				file1.createNewFile();
-
-				git
-						.add()
-						.addFilepattern("file1.txt")
-						.call();
-				
-				git
-						.commit()
-						.setMessage(FILE1_ADDED_COMMIT_MESSAGE)
-						.call();
-				
-				git
-				
-						.checkout()
-						.setCreateBranch(false)
-						.setName(NEW_BRANCH) 
-						.call(); // switch to new-branch
-				
-				File file2 = new File(w.getFolder(), "file2.txt");
-				file2.createNewFile();
-				
-				git
-						.add()
-						.addFilepattern("file2.txt")
-						.call();
-				
-				git
-						.commit()
-						.setMessage(FILE2_ADDED_COMMIT_MESSAGE)
-						.call();
-				
-				git
-						.push()
-						.setPushAll()
-						.setRemote("origin")
-						.setCredentialsProvider(gitVCS.getCredentials())
-						.call();
-				
-				git
-						.checkout()
-						.setCreateBranch(false)
-						.setForce(false)
-						.setName(SRC_BRANCH)
-						.call(); // switch to master
+				repo.createContent(LINE_1.getBytes(), FILE1_ADDED_COMMIT_MESSAGE, FILE1_NAME, SRC_BRANCH);
+				repo.createContent(LINE_2.getBytes(), FILE2_ADDED_COMMIT_MESSAGE, FILE2_NAME, NEW_BRANCH);
 				
 				vcs.merge(NEW_BRANCH, SRC_BRANCH, MERGE_COMMIT_MESSAGE);
-				
 				
 				git
 						.pull()
 						.setCredentialsProvider(gitVCS.getCredentials())
 						.call();
 				
-				assertTrue(file1.exists());
-				assertTrue(file2.exists());
+				assertTrue(new File(w.getFolder(), FILE2_NAME).exists());
+				assertTrue(new File(w.getFolder(), FILE1_NAME).exists());
 				
 				Iterable<RevCommit> commits = git
 						.log()
