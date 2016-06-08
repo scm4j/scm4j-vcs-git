@@ -32,6 +32,7 @@ import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
 import com.projectkaiser.scm.vcs.api.VCSWorkspace;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSException;
+import com.projectkaiser.scm.vcs.api.exceptions.EVCSFileNotFound;
 
 public class GitVCS extends AbstractVCS implements IVCS {
 
@@ -307,6 +308,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			}
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
+		} catch (IOException e) {
+			throw new EVCSFileNotFound(String.format("File %s is not found", filePath));
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

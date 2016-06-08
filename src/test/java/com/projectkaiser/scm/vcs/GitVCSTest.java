@@ -26,7 +26,9 @@ import org.kohsuke.github.GitHub;
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
 import com.projectkaiser.scm.vcs.api.VCSWorkspace;
+import com.projectkaiser.scm.vcs.api.VCSWorkspaceState;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
+import com.projectkaiser.scm.vcs.api.exceptions.EVCSFileNotFound;
 
 public class GitVCSTest  {
 	
@@ -184,7 +186,12 @@ public class GitVCSTest  {
 				
 				assertEquals(vcs.getFileContent("master", "folder/file1.txt"), LINE_2);
 				assertEquals(vcs.getFileContent("master", "folder/file1.txt", "UTF-8"), LINE_2);
-				
+				try {
+					vcs.getFileContent("master", "sdfsdf1.txt");
+					fail("EVCSFileNotFound is not thrown");
+				} catch (EVCSFileNotFound e) {
+					w.unlock();
+				}
 			}
 		} finally {
 			w.unlock();
