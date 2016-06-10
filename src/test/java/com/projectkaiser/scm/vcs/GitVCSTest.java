@@ -1,7 +1,10 @@
 package com.projectkaiser.scm.vcs;
 
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -26,7 +29,6 @@ import org.kohsuke.github.GitHub;
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
 import com.projectkaiser.scm.vcs.api.VCSWorkspace;
-import com.projectkaiser.scm.vcs.api.VCSWorkspaceState;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSFileNotFound;
 
