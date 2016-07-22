@@ -11,12 +11,26 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import org.eclipse.jgit.api.CreateBranchCommand;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.api.errors.CanceledException;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
+import org.eclipse.jgit.api.errors.DetachedHeadException;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.InvalidConfigurationException;
+import org.eclipse.jgit.api.errors.InvalidRefNameException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
+import org.eclipse.jgit.api.errors.RefNotAdvertisedException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.RefSpec;
 import org.junit.After;
@@ -25,12 +39,18 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
+import org.mockito.Mockito;
 
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
-import com.projectkaiser.scm.vcs.api.VCSWorkspace;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSFileNotFound;
+import com.projectkaiser.scm.vcs.api.workingcopy.IVCSLockedWorkingCopy;
+import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepository;
+import com.projectkaiser.scm.vcs.api.workingcopy.IVCSWorkspace;
+import com.projectkaiser.scm.vcs.api.workingcopy.VCSLockedWorkingCopyState;
+import com.projectkaiser.scm.vcs.api.workingcopy.VCSRepository;
+import com.projectkaiser.scm.vcs.api.workingcopy.VCSWorkspace;
 
 public class GitVCSTest  {
 	
@@ -65,10 +85,13 @@ public class GitVCSTest  {
 	
 	private IVCS vcs;
 	private GitHub github;
-	private GitVCS gitVCS;
 	private String repoName;
-	private GHRepository repo;
+	private GHRepository gitHubRepo;
 	private String gitUrl = "https://github.com/" + GITHUB_USER + "/";
+	private IVCSRepository localVCSRepo;
+	private IVCSRepository mockedVCSRepo;
+	private IVCSLockedWorkingCopy mockedLWC;
+	private String repoUrl;
 	
 	
 	private Integer counter = 0;
@@ -106,20 +129,40 @@ public class GitVCSTest  {
 		return res;
 	}
 	
+	public void test() {
+		//IVCSRepository r = new VCSRepository("http://github", "c://workspace");
+		IVCSWorkspace w = new VCSWorkspace("c://workspace");
+		IVCSRepository r = w.getVCSRepository("http://github");
+		
+		
+		IVCS i = new GitVCS(r);
+		/**
+		 * IVCSWrokspace = new VCSWorkspace("c:\workspace")
+		 * IVCSRepository r = new VCSRepository("http://github", w);
+		 * IVCS i = new GitVCS(r);
+		 */
+	}
+	
 	@Before
 	public void setUp() throws IOException {
 		github = GitHub.connectUsingPassword(GITHUB_USER, GITHUB_PASS);
 		String uuid = UUID.randomUUID().toString();
 		repoName = (REPO_NAME + "_" + uuid);
 		 
-		repo = github.createRepository(repoName)
+		gitHubRepo = github.createRepository(repoName)
 				.issues(false)
 				.wiki(false)
 				.autoInit(true)
 				.downloads(false)
 				.create();
-		gitVCS = new GitVCS(null, WORKSPACE_DIR, gitUrl + repoName + ".git");
-		vcs = gitVCS;
+		
+		repoUrl = gitUrl + repoName + ".git";
+		localVCSRepo = new VCSRepository(repoUrl, WORKSPACE_DIR);
+		mockedVCSRepo = Mockito.spy(new VCSRepository(repoUrl, WORKSPACE_DIR));
+		mockedLWC = Mockito.spy(localVCSRepo.getVCSLockedWorkingCopy());
+		Mockito.doReturn(mockedLWC).when(mockedVCSRepo).getVCSLockedWorkingCopy();
+		
+		vcs = new GitVCS(mockedVCSRepo);
 		vcs.setCredentials(GITHUB_USER, GITHUB_PASS);
 		if (PROXY_HOST != null) {
 			vcs.setProxy(PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS);
@@ -129,18 +172,20 @@ public class GitVCSTest  {
 	@After
 	public void tearDown() {
 		try {
-			repo.delete();
+			gitHubRepo.delete();
 		} catch (IOException e) {
 			// do not affect the test
 		}
 	}
 	
 	@Test
-	public void testGitCreateAndDeleteBranch() throws InterruptedException, IOException {
+	public void testGitCreateAndDeleteBranch() throws Exception {
 		vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
+		Mockito.verify(mockedVCSRepo).getVCSLockedWorkingCopy();
+		Mockito.verify(mockedLWC).close();
 		Thread.sleep(2000); // next operation fails time to time. Looks like github has some latency on branch operations
-		assertTrue(repo.getBranches().containsKey(NEW_BRANCH));
-		assertTrue(repo.getBranches().size() == 2); // master & NEW_BRANCH
+		assertTrue(gitHubRepo.getBranches().containsKey(NEW_BRANCH));
+		assertTrue(gitHubRepo.getBranches().size() == 2); // master & NEW_BRANCH
 		
 		try {
 			vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
@@ -148,17 +193,25 @@ public class GitVCSTest  {
 		} catch (EVCSBranchExists e) {
 		}
 		
+		resetMocks();
 		vcs.deleteBranch(NEW_BRANCH, DELETE_BRANCH_COMMIT_MESSAGE);
+		Mockito.verify(mockedVCSRepo).getVCSLockedWorkingCopy();
+		Mockito.verify(mockedLWC).close();
 		Thread.sleep(2000); // next operation fails from time to time. Looks like github has some latency on branch operations
-		assertTrue (repo.getBranches().size() == 1);
+		assertTrue (gitHubRepo.getBranches().size() == 1);
+	}
+
+	private void resetMocks() {
+		Mockito.reset(mockedVCSRepo);
+		mockedLWC = Mockito.spy(localVCSRepo.getVCSLockedWorkingCopy());
+		Mockito.doReturn(mockedLWC).when(mockedVCSRepo).getVCSLockedWorkingCopy();
 	}
 	
 	@Test
-	public void testGetSetFileContent() throws NoFilepatternException, GitAPIException, IOException {
-		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
-		try {
-			try (Git git = gitVCS.getLocalGit(w)) {
-				File file = new File(w.getFolder(), "folder/file1.txt");
+	public void testGetSetFileContent() throws Exception {
+		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy()) {
+			try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
+				File file = new File(wc.getFolder(), "folder/file1.txt");
 				file.getParentFile().mkdirs();
 				file.createNewFile();
 				PrintWriter out = new PrintWriter(file);
@@ -181,10 +234,12 @@ public class GitVCSTest  {
 						.setRefSpecs(spec)
 						.setForce(true)
 						.setRemote("origin")
-						.setCredentialsProvider(gitVCS.getCredentials())
+						.setCredentialsProvider(((GitVCS) vcs).getCredentials())
 						.call();
 				
 				vcs.setFileContent("master", "folder/file1.txt", LINE_2, CONTENT_CHANGED_COMMIT_MESSAGE);
+				Mockito.verify(mockedVCSRepo).getVCSLockedWorkingCopy();
+				Mockito.verify(mockedLWC).close();
 				
 				assertEquals(vcs.getFileContent("master", "folder/file1.txt"), LINE_2);
 				assertEquals(vcs.getFileContent("master", "folder/file1.txt", "UTF-8"), LINE_2);
@@ -192,96 +247,128 @@ public class GitVCSTest  {
 					vcs.getFileContent("master", "sdfsdf1.txt");
 					fail("EVCSFileNotFound is not thrown");
 				} catch (EVCSFileNotFound e) {
-					w.unlock();
+					
 				}
 			}
-		} finally {
-			w.unlock();
 		}
 	}
 	
 	@Test
-	public void testGitMergeConflict() throws IOException, NoFilepatternException, GitAPIException, InterruptedException {
-		repo.createContent(LINE_1.getBytes(), FILE1_ADDED_COMMIT_MESSAGE, FILE1_NAME, SRC_BRANCH);
-		vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
-		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
-		try {
-			try (Git git = gitVCS.getLocalGit(w)) {
+	public void testGitMergeConflict() throws Exception {
+		gitHubRepo.createContent(LINE_1.getBytes(), FILE1_ADDED_COMMIT_MESSAGE, FILE1_NAME, SRC_BRANCH);
+		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy()) {
+			vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
+			try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
 				
-				git
-						.checkout()
-						.setCreateBranch(false)
-						.setName(SRC_BRANCH)
-						.call(); // switch to master
-				
-				git
-						.pull()
-						.setCredentialsProvider(gitVCS.getCredentials())
-						.call();
-				
-				File file = new File(w.getFolder(), FILE1_NAME);
-				FileWriter writer = new FileWriter(file, false);
-				writer.write(LINE_3);
-				writer.close();
-				
-				git
-						.commit()
-						.setAll(true)
-						.setMessage(FILE1_CHANGED_COMMIT_MESSAGE)
-						.call();
-				
-				git
-						.checkout()
-						.setCreateBranch(true)
-						.setStartPoint("origin/" + NEW_BRANCH)
-						.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.TRACK)
-						.setName(NEW_BRANCH)
-						.call(); // switch to new-branch and track origin/new-branch
-				                 // note: local new-branch was deleted at gitVCS.createBranch(). 
-								 // If not delete then new-branch will exist without tracking origin/new-branch 
-				
-				file = new File(w.getFolder(), FILE1_NAME);
-				writer = new FileWriter(file, false);
-				writer.write(LINE_4);
-				writer.close();
-				
-				git
-						.commit()
-						.setAll(true)
-						.setMessage(FILE2_CHANGED_COMMIT_MESSAGE)
-						.call();
-				
-				git
-						.checkout()
-						.setCreateBranch(false)
-						.setName(SRC_BRANCH)
-						.call(); // switch to master
-				
-				git
-						.push()
-						.setPushAll()
-						.setRemote("origin")
-						.setCredentialsProvider(gitVCS.getCredentials())
-						.call();
+				File file = prepareMerge(wc, git);
 
-				
+				resetMocks();
+				vcs = Mockito.spy((GitVCS) vcs);
+				Git mockedGit = Mockito.spy(((GitVCS) vcs).getLocalGit(mockedLWC));
+				Mockito.doReturn(mockedGit).when((GitVCS) vcs).getLocalGit(Mockito.any(IVCSLockedWorkingCopy.class));
 				PKVCSMergeResult res = vcs.merge(NEW_BRANCH, SRC_BRANCH, MERGE_COMMIT_MESSAGE);
-				
+				Mockito.verify(mockedGit).reset();
+				Mockito.verify(mockedVCSRepo).getVCSLockedWorkingCopy();
+				Mockito.verify(mockedLWC).close();
+				assertFalse(mockedLWC.getCorrupt());
 				assertFalse(res.getSuccess());
 				assertTrue(res.getConflictingFiles().size() == 1);
 				assertTrue(res.getConflictingFiles().contains(file.getName()));
 			}
-		} finally {
-			w.unlock();
 		}
 	}
 	
+	@Test 
+	public void testGitMergeConflictWCCorruption() throws Exception {
+		gitHubRepo.createContent(LINE_1.getBytes(), FILE1_ADDED_COMMIT_MESSAGE, FILE1_NAME, SRC_BRANCH);
+		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy()) {
+			vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
+			try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
+				
+				File file = prepareMerge(wc, git);
+
+				resetMocks();
+				vcs = Mockito.spy((GitVCS) vcs);
+				Git mockedGit = Mockito.spy(((GitVCS) vcs).getLocalGit(mockedLWC));
+				Mockito.doReturn(mockedGit).when((GitVCS) vcs).getLocalGit(Mockito.any(IVCSLockedWorkingCopy.class));
+				Mockito.doThrow(new RuntimeException("Git.reset() failed test exception")).when(mockedGit).reset();
+				PKVCSMergeResult res = vcs.merge(NEW_BRANCH, SRC_BRANCH, MERGE_COMMIT_MESSAGE);
+				Mockito.verify(mockedGit).reset();
+				Mockito.verify(mockedLWC).setCorrupt(true);
+				Mockito.verify(mockedVCSRepo).getVCSLockedWorkingCopy();
+				Mockito.verify(mockedLWC).close();
+				assertTrue(mockedLWC.getCorrupt());
+				assertFalse(res.getSuccess());
+				assertTrue(res.getConflictingFiles().size() == 1);
+				assertTrue(res.getConflictingFiles().contains(file.getName()));
+			}
+		}
+	}
+
+	private File prepareMerge(IVCSLockedWorkingCopy wc, Git git) throws Exception {
+		git
+				.checkout()
+				.setCreateBranch(true)
+				.setStartPoint("origin/" + SRC_BRANCH)
+				.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.TRACK)
+				.setName(SRC_BRANCH)
+				.call(); // switch to master and track origin/master
+		
+		git
+				.pull()
+				.setCredentialsProvider(((GitVCS) vcs).getCredentials())
+				.call();
+		
+		File file = new File(wc.getFolder(), FILE1_NAME);
+		FileWriter writer = new FileWriter(file, false);
+		writer.write(LINE_3);
+		writer.close();
+		
+		git
+				.commit()
+				.setAll(true)
+				.setMessage(FILE1_CHANGED_COMMIT_MESSAGE)
+				.call();
+		
+		git
+				.checkout()
+				.setCreateBranch(true)
+				.setStartPoint("origin/" + NEW_BRANCH)
+				.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.TRACK)
+				.setName(NEW_BRANCH)
+				.call(); // switch to new-branch and track origin/new-branch
+		
+		file = new File(wc.getFolder(), FILE1_NAME);
+		writer = new FileWriter(file, false);
+		writer.write(LINE_4);
+		writer.close();
+		
+		git
+				.commit()
+				.setAll(true)
+				.setMessage(FILE2_CHANGED_COMMIT_MESSAGE)
+				.call();
+		
+		git
+				.checkout()
+				.setCreateBranch(false)
+				.setName(SRC_BRANCH)
+				.call(); // switch to master
+		
+		git
+				.push()
+				.setPushAll()
+				.setRemote("origin")
+				.setCredentialsProvider(((GitVCS) vcs).getCredentials())
+				.call();
+		return file;
+	}
+	
 	@Test
-	public void testGitMerge() throws IOException, NoFilepatternException, GitAPIException, InterruptedException {
+	public void testGitMerge() throws Exception {
 		vcs.createBranch(SRC_BRANCH, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
-		VCSWorkspace w = VCSWorkspace.getLockedWorkspace(gitVCS.getRepoFolder());
-		try {
-			try (Git git = gitVCS.getLocalGit(w)) {
+		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy()) {
+			try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
 				
 				git
 						.checkout()
@@ -289,44 +376,38 @@ public class GitVCSTest  {
 						.setName(SRC_BRANCH)
 						.call(); // switch to master
 				
-				repo.createContent(LINE_1.getBytes(), FILE1_ADDED_COMMIT_MESSAGE, FILE1_NAME, SRC_BRANCH);
-				repo.createContent(LINE_2.getBytes(), FILE2_ADDED_COMMIT_MESSAGE, FILE2_NAME, NEW_BRANCH);
+				gitHubRepo.createContent(LINE_1.getBytes(), FILE1_ADDED_COMMIT_MESSAGE, FILE1_NAME, SRC_BRANCH);
+				gitHubRepo.createContent(LINE_2.getBytes(), FILE2_ADDED_COMMIT_MESSAGE, FILE2_NAME, NEW_BRANCH);
 				
 				vcs.merge(NEW_BRANCH, SRC_BRANCH, MERGE_COMMIT_MESSAGE);
 				
 				git
 						.pull()
-						.setCredentialsProvider(gitVCS.getCredentials())
+						.setCredentialsProvider(((GitVCS) vcs).getCredentials())
 						.call();
 				
-				assertTrue(new File(w.getFolder(), FILE2_NAME).exists());
-				assertTrue(new File(w.getFolder(), FILE1_NAME).exists());
+				assertTrue(new File(wc.getFolder(), FILE2_NAME).exists());
+				assertTrue(new File(wc.getFolder(), FILE1_NAME).exists());
 				
 				Iterable<RevCommit> commits = git
 						.log()
 						.all()
 						.call();
 				
-				commits.forEach(new Consumer<RevCommit>() {
-	
-					@Override
-					public void accept(RevCommit arg0) {
-						if (!arg0.getFullMessage().equals(INITIAL_COMMIT_MESSAGE) &&
-								!arg0.getFullMessage().equals(FILE2_ADDED_COMMIT_MESSAGE) &&
-								!arg0.getFullMessage().equals(FILE1_ADDED_COMMIT_MESSAGE) &&
-								!arg0.getFullMessage().equals(MERGE_COMMIT_MESSAGE)) {
-							fail("Unexpected commit met: " + arg0.getFullMessage());
-						} else {
-							counter++;
-						}
+				for (RevCommit commit : commits) {
+					if (!commit.getFullMessage().equals(INITIAL_COMMIT_MESSAGE) &&
+							!commit.getFullMessage().equals(FILE2_ADDED_COMMIT_MESSAGE) &&
+							!commit.getFullMessage().equals(FILE1_ADDED_COMMIT_MESSAGE) &&
+							!commit.getFullMessage().equals(MERGE_COMMIT_MESSAGE)) {
+						fail("Unexpected commit met: " + commit.getFullMessage());
+					} else {
+						counter++;
 					}
-				});
+				}
 				
 				assertTrue(counter == 4);
 				
 			}
-		} finally {
-			w.unlock();
 		}
 	}
 }

@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.logging.Log;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
@@ -26,26 +25,28 @@ import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 
-import com.projectkaiser.scm.vcs.api.AbstractVCS;
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
-import com.projectkaiser.scm.vcs.api.VCSWorkspace;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSException;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSFileNotFound;
+import com.projectkaiser.scm.vcs.api.workingcopy.IVCSLockedWorkingCopy;
+import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepository;
 
-public class GitVCS extends AbstractVCS implements IVCS {
+public class GitVCS implements IVCS {
 
 	private CredentialsProvider credentials;
 	
-	public GitVCS(Log logger, String workspacePath, String remoteUrl) {
-		super (logger, workspacePath, remoteUrl);
-	}
+	IVCSRepository repo;
 	
 	public CredentialsProvider getCredentials() {
 		return credentials;
 	}
-
+	
+	public GitVCS(IVCSRepository repo) {
+		this.repo = repo;
+	}
+	
 	public void setCredentials(CredentialsProvider credentials) {
 		this.credentials = credentials;
 	}
@@ -54,10 +55,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 	public void createBranch(String srcBranchName, String newBranchName, String commitMessage) {
 		// note: no commit message could be attached in Git
 		try {
-			VCSWorkspace workspace = VCSWorkspace.getLockedWorkspace(repoFolder);
-			try {
-				
-				try (Git git = getLocalGit(workspace)) {
+			try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+				try (Git git = getLocalGit(wc)) {
 					
 					git
 							.checkout()
@@ -78,15 +77,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 							.setRefSpecs(refSpec)
 							.setCredentialsProvider(credentials)
 							.call();
-					
-					git
-							.branchDelete()
-							.setBranchNames(newBranchName)
-							.call();
-					
 				}
-			} finally {
-				workspace.unlock();
 			}
 		} catch (RefAlreadyExistsException e) {
 			throw new EVCSBranchExists (e);
@@ -100,9 +91,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 	@Override
 	public void deleteBranch(String branchName, String commitMessage) {
 		try {
-			VCSWorkspace workspace = VCSWorkspace.getLockedWorkspace(repoFolder);
-			try {
-				try (Git git = getLocalGit(workspace)) {
+			try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+				try (Git git = getLocalGit(wc)) {
 					
 					git
 							.pull()
@@ -129,13 +119,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 							.setRemote("origin")
 							.setCredentialsProvider(credentials)
 							.call();
-					
 				}
-							
-			} finally {
-				workspace.unlock();
 			}
-			
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -143,25 +128,25 @@ public class GitVCS extends AbstractVCS implements IVCS {
 		}
 	}
 
-	public Git getLocalGit(VCSWorkspace workspace) {
+	public Git getLocalGit(IVCSLockedWorkingCopy wc) {
 		
-		Repository repo;
+		Repository gitRepo;
 		try {
-			repo = new FileRepositoryBuilder()
-					.setGitDir(new File(workspace.getFolder(), ".git"))
+			gitRepo = new FileRepositoryBuilder()
+					.setGitDir(new File(wc.getFolder(), ".git"))
 					.build();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		Boolean repoInited = repo
+		Boolean repoInited = gitRepo
 				.getObjectDatabase()
 				.exists();
 		if (!repoInited) {
 			try {
 				Git
 						.cloneRepository()
-						.setDirectory(workspace.getFolder())
-						.setURI(baseUrl)
+						.setDirectory(wc.getFolder())
+						.setURI(repo.getRepoUrl())
 						.setCredentialsProvider(credentials)
 						.setNoCheckout(true)
 						.call();
@@ -171,16 +156,14 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			
 		}
 		
-		return new Git(repo);
+		return new Git(gitRepo);
 	}
 
 	@Override
 	public PKVCSMergeResult merge(String sourceBranchUrl, String destBranchUrl, String commitMessage) {
-		
 		try {
-			VCSWorkspace workspace = VCSWorkspace.getLockedWorkspace(repoFolder);
-			try {
-				try (Git git = getLocalGit(workspace)) {
+			try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+				try (Git git = getLocalGit(wc)) {
 					
 					git
 							.pull()
@@ -212,7 +195,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 									.setMode(ResetType.HARD)
 									.call();
 						} catch(Exception e) {
-							workspace.setCorrupt(true);
+							wc.setCorrupt(true);
 						}
 					} else {
 						git
@@ -225,10 +208,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 					
 					return res;
 				}
-			} finally {
-				workspace.unlock();
 			}
-			
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -257,7 +237,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			
 			@Override
 			public List<Proxy> select(URI uri) {
-				if (uri.toString().contains(baseUrl)) {
+				if (uri.toString().contains(repo.getRepoUrl())) {
 					return Arrays.asList(new Proxy(Type.HTTP, InetSocketAddress
 		                    .createUnresolved(host, port)));
 				} else {
@@ -268,7 +248,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 			
 			@Override
 			public void connectFailed(URI uri, SocketAddress sa, IOException ioe) {
-				if (uri.toString().contains(baseUrl)) {
+				if (uri.toString().contains(repo.getRepoUrl())) {
 					throw new RuntimeException("GitVCS proxy connect failed");
 				}
 			}
@@ -276,40 +256,38 @@ public class GitVCS extends AbstractVCS implements IVCS {
 	}
 
 	@Override
-	public String getBaseUrl() {
-		return baseUrl; 
+	public String getRepoUrl() {
+		return repo.getRepoUrl(); 
 	}
 
 	@Override
-	public String getFileContent(String branchName, String filePath, String encoding) {
-		try {
-			VCSWorkspace workspace = VCSWorkspace.getLockedWorkspace(repoFolder);
-			try {
-				try (Git git = getLocalGit(workspace)) {
-					
-					git
-							.pull()
-							.setCredentialsProvider(credentials)
-							.call();
-					
-					git
-							.checkout()
-							.setCreateBranch(false)
-							.addPath(filePath)
-							.setName(branchName)
-							.call();
-					File file = new File(workspace.getFolder(), filePath);
-					
+	public String getFileContent(String branchName, String fileRelativePath, String encoding) {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+			try (Git git = getLocalGit(wc)) {
+				
+				git
+						.pull()
+						.setCredentialsProvider(credentials)
+						.call();
+				
+				git
+						.checkout()
+						.setCreateBranch(false)
+						.addPath(fileRelativePath)
+						.setName(branchName)
+						.call();
+				File file = new File(wc.getFolder(), fileRelativePath);
+				
+				try {
 					return IOUtils.toString(file.toURI(), encoding);
+				} catch (IOException e) {
+					throw new EVCSFileNotFound(String.format("File %s is not found", fileRelativePath));
 				}
-							
-			} finally {
-				workspace.unlock();
 			}
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
-		} catch (IOException e) {
-			throw new EVCSFileNotFound(String.format("File %s is not found", filePath));
+		} catch (EVCSFileNotFound e) {
+			throw e;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -318,9 +296,8 @@ public class GitVCS extends AbstractVCS implements IVCS {
 	@Override
 	public void setFileContent(String branchName, String filePath, String content, String commitMessage) {
 		try {
-			VCSWorkspace workspace = VCSWorkspace.getLockedWorkspace(repoFolder);
-			try {
-				try (Git git = getLocalGit(workspace)) {
+			try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+				try (Git git = getLocalGit(wc)) {
 					
 					git
 							.pull()
@@ -334,7 +311,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 							.setName(branchName)
 							.call();
 					
-					File file = new File(workspace.getFolder(), filePath);
+					File file = new File(wc.getFolder(), filePath);
 					FileWriter fw = new FileWriter(file, false);
 					fw.write(content);
 					fw.close();
@@ -354,11 +331,7 @@ public class GitVCS extends AbstractVCS implements IVCS {
 							.setCredentialsProvider(credentials)
 							.call();
 				}
-							
-			} finally {
-				workspace.unlock();
 			}
-			
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
