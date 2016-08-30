@@ -31,19 +31,19 @@ import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSException;
 import com.projectkaiser.scm.vcs.api.exceptions.EVCSFileNotFound;
 import com.projectkaiser.scm.vcs.api.workingcopy.IVCSLockedWorkingCopy;
-import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepository;
+import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 
 public class GitVCS implements IVCS {
 
 	private CredentialsProvider credentials;
 	
-	IVCSRepository repo;
+	IVCSRepositoryWorkspace repo;
 	
 	public CredentialsProvider getCredentials() {
 		return credentials;
 	}
 	
-	public GitVCS(IVCSRepository repo) {
+	public GitVCS(IVCSRepositoryWorkspace repo) {
 		this.repo = repo;
 	}
 	
@@ -77,6 +77,7 @@ public class GitVCS implements IVCS {
 							.setRefSpecs(refSpec)
 							.setCredentialsProvider(credentials)
 							.call();
+					git.getRepository().close();
 				}
 			}
 		} catch (RefAlreadyExistsException e) {
@@ -119,6 +120,7 @@ public class GitVCS implements IVCS {
 							.setRemote("origin")
 							.setCredentialsProvider(credentials)
 							.call();
+					git.getRepository().close();
 				}
 			}
 		} catch (GitAPIException e) {
@@ -149,14 +151,15 @@ public class GitVCS implements IVCS {
 						.setURI(repo.getRepoUrl())
 						.setCredentialsProvider(credentials)
 						.setNoCheckout(true)
-						.call();
+						.call()
+						.close();
 			} catch (GitAPIException e) {
 				throw new EVCSException(e);
 			}
 			
 		}
-		
-		return new Git(gitRepo);
+		Git res = new Git(gitRepo);
+		return res; 
 	}
 
 	@Override
@@ -170,7 +173,11 @@ public class GitVCS implements IVCS {
 							.setCredentialsProvider(credentials)
 							.call();
 				
-					checkout(destBranchUrl, git);
+					git
+							.checkout()
+							.setCreateBranch(false)
+							.setName(destBranchUrl)
+							.call(); 
 			
 					MergeResult mr = git
 							.merge()
@@ -195,7 +202,7 @@ public class GitVCS implements IVCS {
 									.setMode(ResetType.HARD)
 									.call();
 						} catch(Exception e) {
-							wc.setCorrupt(true);
+							wc.setCorrupted(true);
 						}
 					} else {
 						git
@@ -205,7 +212,7 @@ public class GitVCS implements IVCS {
 								.setCredentialsProvider(credentials)
 								.call();
 					}
-					
+					git.getRepository().close();
 					return res;
 				}
 			}
@@ -216,14 +223,6 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private void checkout(String destBranchUrl, Git git) throws GitAPIException {
-		git
-				.checkout()
-				.setCreateBranch(false)
-				.setName(destBranchUrl)
-				.call(); 
-	}
-	
 	@Override
 	public void setCredentials(String user, String password) {
 		credentials = new UsernamePasswordCredentialsProvider(user, password);
@@ -237,7 +236,7 @@ public class GitVCS implements IVCS {
 			
 			@Override
 			public List<Proxy> select(URI uri) {
-				if (uri.toString().contains(repo.getRepoUrl())) {
+				if (uri.toString().toLowerCase().contains(repo.getRepoUrl().toLowerCase())) {
 					return Arrays.asList(new Proxy(Type.HTTP, InetSocketAddress
 		                    .createUnresolved(host, port)));
 				} else {
@@ -276,6 +275,8 @@ public class GitVCS implements IVCS {
 						.addPath(fileRelativePath)
 						.setName(branchName)
 						.call();
+				git.getRepository().close();
+				
 				File file = new File(wc.getFolder(), fileRelativePath);
 				
 				try {
@@ -330,6 +331,7 @@ public class GitVCS implements IVCS {
 							.setRemote("origin")
 							.setCredentialsProvider(credentials)
 							.call();
+					git.getRepository().close();
 				}
 			}
 		} catch (GitAPIException e) {
