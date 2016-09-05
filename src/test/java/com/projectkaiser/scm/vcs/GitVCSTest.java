@@ -3,9 +3,7 @@ package com.projectkaiser.scm.vcs;
 
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -83,7 +81,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	
 	@Override
-	public void setUp() throws IOException {
+	public void setUp() throws Exception {
 		super.setUp();
 		github = GitHub.connectUsingPassword(GITHUB_USER, GITHUB_PASS);
 		gitHubRepo = github.createRepository(repoName)
@@ -104,39 +102,37 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 	
 	@Override
-	protected void createTestContent(String filePath, String fileContent, String branchName, 
-			String commitMessage) throws Exception {
-		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy()) {
-			try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
-				checkout(branchName, git);
-				
-				File file = new File(wc.getFolder(), filePath);
-				file.getParentFile().mkdirs();
-				file.createNewFile();
-				PrintWriter out = new PrintWriter(file);
-				out.print(fileContent);
-				out.close();
-				
-				git
-						.add()
-						.addFilepattern(filePath)
-						.call();
-				
-				git
-						.commit()
-						.setMessage(commitMessage)
-						.call();
-				
-				RefSpec spec = new RefSpec(branchName + ":" + branchName);
-				git
-						.push()
-						.setRefSpecs(spec)
-						.setRemote("origin")
-						.setCredentialsProvider(((GitVCS) vcs).getCredentials())
-						.call();
-				
-				git.getRepository().close();
-			}
+	protected void sendFile(IVCSLockedWorkingCopy wc, String branchName, String filePath, String commitMessage) throws Exception {
+		try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
+			checkout(branchName, git);
+			
+			git
+					.add()
+					.addFilepattern(filePath)
+					.call();
+			
+			git
+					.commit()
+					.setMessage(commitMessage)
+					.call();
+			
+			RefSpec spec = new RefSpec(branchName + ":" + branchName);
+			git
+					.push()
+					.setRefSpecs(spec)
+					.setRemote("origin")
+					.setCredentialsProvider(((GitVCS) vcs).getCredentials())
+					.call();
+	
+			git.getRepository().close();
+		}
+	}
+	
+	@Override
+	protected void checkout(String branchName, IVCSLockedWorkingCopy wc) throws Exception {
+		try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
+			checkout(branchName, git);
+			git.getRepository().close();
 		}
 	}
 
@@ -206,5 +202,9 @@ public class GitVCSTest extends VCSAbstractTest {
 			mockedGit = null;
 		}
 	}
+
+	
+
+	
 }
 
