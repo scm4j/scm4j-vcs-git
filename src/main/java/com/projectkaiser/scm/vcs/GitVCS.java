@@ -10,6 +10,7 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -19,11 +20,20 @@ import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffEntry.Side;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.PKVCSMergeResult;
@@ -78,6 +88,8 @@ public class GitVCS implements IVCS {
 							.setCredentialsProvider(credentials)
 							.call();
 					git.getRepository().close();
+					Thread.sleep(2000); // github has some latency on branch operations
+										// so next request branches operation will return old branches list
 				}
 			}
 		} catch (RefAlreadyExistsException e) {
@@ -121,6 +133,8 @@ public class GitVCS implements IVCS {
 							.setCredentialsProvider(credentials)
 							.call();
 					git.getRepository().close();
+					Thread.sleep(2000); // github has some latency on branch operations
+										// so next request branches operation will return old branches list
 				}
 			}
 		} catch (GitAPIException e) {
@@ -344,6 +358,49 @@ public class GitVCS implements IVCS {
 	@Override
 	public String getFileContent(String branchName, String filePath) {
 		return getFileContent(branchName, filePath, StandardCharsets.UTF_8.name());
+	}
+
+	@Override
+	public List<String> getBranchesDiff(String srcBranchName, String destBranchName) {
+		List<String> res = new ArrayList<>();
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+			try (Git git = getLocalGit(wc)) {
+				 // the diff works on TreeIterators, we prepare two for the two branches
+		        AbstractTreeIterator oldTreeParser = prepareTreeParser(git.getRepository(), "refs/heads/" + srcBranchName);
+		        AbstractTreeIterator newTreeParser = prepareTreeParser(git.getRepository(), "refs/heads/" + destBranchName);
+
+		        // then the procelain diff-command returns a list of diff entries
+		        List<DiffEntry> diff = git.diff().setOldTree(oldTreeParser).setNewTree(newTreeParser).call();
+		        for (DiffEntry entry : diff) {
+		            res.add(entry.getPath(Side.OLD));
+		        }
+		        git.getRepository().close();
+		        return res;
+			}
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+		
+	}
+	
+	private AbstractTreeIterator prepareTreeParser(Repository repository, String ref) throws Exception {
+		// from the commit we can build the tree which allows us to construct the TreeParser
+		Ref head = repository.exactRef(ref);
+		try (RevWalk walk = new RevWalk(repository)) {
+		    RevCommit commit = walk.parseCommit(head.getObjectId());
+		    RevTree tree = walk.parseTree(commit.getTree().getId());
+		
+		    CanonicalTreeParser oldTreeParser = new CanonicalTreeParser();
+		    try (ObjectReader oldReader = repository.newObjectReader()) {
+		        oldTreeParser.reset(oldReader, tree.getId());
+		    }
+		
+		    walk.dispose();
+		
+		    return oldTreeParser;
+		}
 	}
 
 }
