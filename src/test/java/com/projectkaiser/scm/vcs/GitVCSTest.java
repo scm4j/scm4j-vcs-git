@@ -22,6 +22,7 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.mockito.Mockito;
 
+import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.abstracttest.VCSAbstractTest;
 import com.projectkaiser.scm.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepositoryWorkspace;
@@ -160,12 +161,13 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 
 	@Override
-	protected void createVCS(IVCSRepositoryWorkspace mockedVCSRepo) {
-		vcs = Mockito.spy(new GitVCS(mockedVCSRepo));
+	protected IVCS getVCS(IVCSRepositoryWorkspace mockedVCSRepo) {
+		IVCS vcs = Mockito.spy(new GitVCS(mockedVCSRepo));
 		vcs.setCredentials(GITHUB_USER, GITHUB_PASS);
 		if (PROXY_HOST != null) {
 			vcs.setProxy(PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS);
 		}
+		return vcs;
 	}
 
 	@Override
@@ -174,7 +176,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 
 	@Override
-	protected Set<String>  getCommitMessagesRemote(String branchName) throws Exception {
+	protected Set<String> getCommitMessagesRemote(String branchName) throws Exception {
 		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy()) {
 			try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
 				Iterable<RevCommit> logs = git
@@ -202,9 +204,5 @@ public class GitVCSTest extends VCSAbstractTest {
 			mockedGit = null;
 		}
 	}
-
-	
-
-	
 }
 
