@@ -156,7 +156,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 
 	@Override
-	protected String getVCSRepoUrl() {
+	protected String getTestRepoUrl() {
 		return gitUrl;
 	}
 
