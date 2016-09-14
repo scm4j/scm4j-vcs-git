@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
@@ -327,6 +328,14 @@ public class GitVCS implements IVCS {
 							.call();
 					
 					File file = new File(wc.getFolder(), filePath);
+					if (!file.exists()) {
+						FileUtils.forceMkdir(file.getParentFile());
+						file.createNewFile();
+						git
+								.add()
+								.addFilepattern(filePath)
+								.call();
+					}
 					FileWriter fw = new FileWriter(file, false);
 					fw.write(content);
 					fw.close();
