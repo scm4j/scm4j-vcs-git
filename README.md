@@ -44,7 +44,7 @@ Pk-vcs-git is [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) IVCS imp
 	IVCS vcs = new GitVCS(repoWorkspace);
 ```
 - Use `vcs.setProxy()` and `vcs.setCredentials()` if neccessary
-- 
+
 # Implementation details
 
 - [JGit](https://eclipse.org/jgit/) is used as framework to work with Git repositories
