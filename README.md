@@ -7,6 +7,8 @@ Pk-vcs-git is [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) IVCS imp
   - Home folder of all folders used by vcs-related operations. See [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) for details
 - Repository Workspace
   - Folder for LWC folders related to Repository of one type. See [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) for details
+- Locked Working Copy, LWC
+  - Folder where vcs-related operations are executed. Provides thread- and process-safe repository of working folders. See [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) for details
 - Test Repository
   - Git repository which is used to execute functional tests
   - Hosted on [Github](https://github.com/) using username and password provided by enviroment variables (see below)
