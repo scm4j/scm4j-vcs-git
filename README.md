@@ -15,7 +15,7 @@ Pk-vcs-git is [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) IVCS imp
   - [Kohsuke Github API](http://github-api.kohsuke.org/) is used as to work with Github API
 
 # Using pk-vcs-git
-- Add github-hosted pk-vcs-git project as maven dependency using jitpack.io. As an example, add following to gradle.build file:
+- Add github-hosted pk-vcs-git project as maven dependency using [jitpack.io](https://jitpack.io/). As an example, add following to gradle.build file:
 	```gradle
 	allprojects {
 		repositories {
