@@ -44,6 +44,7 @@ Pk-vcs-git is lightweight library for execute basic Git VCS operations (merge, b
 ```java
 	IVCS vcs = new GitVCS(repoWorkspace);
 ```
+- Use methods of `IVCS` interface. See [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) for details
 - Use `vcs.setProxy()` and `vcs.setCredentials()` if neccessary
 
 # Implementation details
