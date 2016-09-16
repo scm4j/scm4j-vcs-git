@@ -1,6 +1,5 @@
 # Overview
-
-Pk-vcs-git is [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) IVCS implementation for Git repositories.
+Pk-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) exposing IVCS implementation for Git repositories.
 
 # Terms
 - Workspace Home
@@ -48,7 +47,6 @@ Pk-vcs-git is [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) IVCS imp
 - Use `vcs.setProxy()` and `vcs.setCredentials()` if neccessary
 
 # Implementation details
-
 - [JGit](https://eclipse.org/jgit/) is used as framework to work with Git repositories
 - [Github](https://github.com/) is used as hosting of a Test Repository
 - LWC is obtained for each vcs operation.
@@ -57,10 +55,13 @@ Pk-vcs-git is [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) IVCS imp
 - If `IVCS.setProxy()` is called then provided proxy is used to each url which contains `repoUrl`
 
 # Functional testing
-
 - Github is used for hosting the Test Repository
   - [Kohsuke Github API](http://github-api.kohsuke.org/) is used to create and delete Test Repository
   - `PK_VCS_TEST_GITHUB_USER` enviroment var or JVM var is used as username for access to Github
   - `PK_VCS_TEST_GITHUB_PASS` enviroment var or JVM var is used as user password for access to Github
   - New Test Repository is created before each test and deletes automatically after each test
 - To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See  [pk-vcs-test](https://github.com/ProjectKaiser/pk-vcs-test) for details
+- NOTE: Github has some latency for exposing results of previosly executed operations. For example if create a new branch and immediately check branches list then Github could return old branches list. Need to wait a couple of second to get new list. So if a test failed then try to execute it again. 
+
+# Limitations
+- Commit messages can not be atached to branch create and delete operations because Git does not exposes these operations as separate commits
