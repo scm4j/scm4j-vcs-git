@@ -4,18 +4,8 @@ package com.projectkaiser.scm.vcs;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
-import org.eclipse.jgit.api.CreateBranchCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.transport.RefSpec;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.kohsuke.github.GHRepository;
@@ -24,7 +14,6 @@ import org.mockito.Mockito;
 
 import com.projectkaiser.scm.vcs.api.IVCS;
 import com.projectkaiser.scm.vcs.api.abstracttest.VCSAbstractTest;
-import com.projectkaiser.scm.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 
 public class GitVCSTest extends VCSAbstractTest {
@@ -38,7 +27,6 @@ public class GitVCSTest extends VCSAbstractTest {
 			Integer.parseInt(getJvmProperty("https.proxyPort"));
 	private static final String PROXY_USER = getJvmProperty("https.proxyUser");
 	private static final String PROXY_PASS = getJvmProperty("https.proxyPassword");
-	private static final String VCS_TYPE_STRING = "git";
 	
 	private GitHub github;
 	
@@ -103,59 +91,6 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 	
 	@Override
-	protected void sendFile(IVCSLockedWorkingCopy wc, String branchName, String filePath, String commitMessage) throws Exception {
-		try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
-			checkout(branchName, git);
-			
-			git
-					.add()
-					.addFilepattern(filePath)
-					.call();
-			
-			git
-					.commit()
-					.setMessage(commitMessage)
-					.call();
-			
-			RefSpec spec = new RefSpec(branchName + ":" + branchName);
-			git
-					.push()
-					.setRefSpecs(spec)
-					.setRemote("origin")
-					.setCredentialsProvider(((GitVCS) vcs).getCredentials())
-					.call();
-	
-			git.getRepository().close();
-		}
-	}
-	
-	@Override
-	protected void checkout(String branchName, IVCSLockedWorkingCopy wc) throws Exception {
-		try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
-			checkout(branchName, git);
-			git.getRepository().close();
-		}
-	}
-
-	private void checkout(String branchName, Git git) throws IOException, GitAPIException, RefAlreadyExistsException,
-			RefNotFoundException, InvalidRefNameException, CheckoutConflictException {
-		Boolean branchExists = git.getRepository().exactRef("refs/heads/" + branchName) != null;
-		
-		git
-				.checkout()
-				.setCreateBranch(!branchExists)
-				.setStartPoint("origin/" + branchName)
-				.setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.TRACK)
-				.setName(branchName)
-				.call(); // switch to branchName and track origin/branchName
-	}
-	
-	@Override
-	public String getVCSTypeString() {
-		return VCS_TYPE_STRING;
-	}
-
-	@Override
 	protected String getTestRepoUrl() {
 		return gitUrl;
 	}
@@ -171,29 +106,6 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 
 	@Override
-	protected Set<String> getBranches() throws IOException {
-		return gitHubRepo.getBranches().keySet();
-	}
-
-	@Override
-	protected Set<String> getCommitMessagesRemote(String branchName) throws Exception {
-		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy()) {
-			try (Git git = ((GitVCS) vcs).getLocalGit(wc)) {
-				Iterable<RevCommit> logs = git
-						.log()
-						.add(git.getRepository().resolve("remotes/origin/" + branchName))
-						.call();
-				Set<String> res = new HashSet<>();
-				for (RevCommit commit : logs) {
-					res.add(commit.getFullMessage());
-				}
-				git.getRepository().close();
-				return res;
-			}
-		}
-	}
-
-	@Override
 	protected void setMakeFailureOnVCSReset(Boolean doMakeFailure) {
 		if (doMakeFailure) {
 			mockedGit = Mockito.spy(((GitVCS) vcs).getLocalGit(mockedLWC));
@@ -203,6 +115,11 @@ public class GitVCSTest extends VCSAbstractTest {
 			Mockito.doCallRealMethod().when((GitVCS) vcs).getLocalGit(mockedLWC);
 			mockedGit = null;
 		}
+	}
+
+	@Override
+	protected String getVCSTypeString() {
+		return GitVCS.GIT_VCS_TYPE_STRING;
 	}
 }
 
