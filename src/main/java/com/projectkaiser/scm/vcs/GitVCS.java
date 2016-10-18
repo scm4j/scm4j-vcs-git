@@ -471,13 +471,14 @@ public class GitVCS implements IVCS {
 	}
 
 	@Override
-	public List<String> getCommitMessages(String branchName) {
+	public List<String> getCommitMessages(String branchName, Integer limit) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 			try (Git git = getLocalGit(wc)) {
 				Iterable<RevCommit> logs = git
 						.log()
 						.add(git.getRepository().resolve("remotes/origin/" 
 									+ parseBranch(branchName)))
+						.setMaxCount(limit)
 						.call();
 				List<String> res = new ArrayList<>();
 				for (RevCommit commit : logs) {
