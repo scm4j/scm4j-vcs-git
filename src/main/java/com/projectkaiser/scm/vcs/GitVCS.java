@@ -18,6 +18,7 @@ import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.MergeResult;
@@ -31,13 +32,12 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
 import com.projectkaiser.scm.vcs.api.IVCS;
@@ -89,6 +89,7 @@ public class GitVCS implements IVCS {
 					
 						git
 								.branchCreate()
+								.setUpstreamMode(SetupUpstreamMode.TRACK)
 								.setName(newBranchName)
 								.call();
 						
@@ -391,51 +392,53 @@ public class GitVCS implements IVCS {
 		List<VCSDiffEntry> res = new ArrayList<>();
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 			try (Git git = getLocalGit(wc)) {
-		        AbstractTreeIterator oldTreeParser = prepareTreeParser(git.getRepository(), "refs/heads/" 
-		        		+ parseBranch(destBranchName));
-		        AbstractTreeIterator newTreeParser = prepareTreeParser(git.getRepository(), "refs/heads/"
-		        		+ parseBranch(srcBranchName));
+		        try (RevWalk walk = new RevWalk(git.getRepository())) {
+			        
+			        RevCommit srcHeadCommit = walk.parseCommit(git.getRepository().resolve("remotes/origin/" 
+			        		+ parseBranch(srcBranchName)));
+			        RevCommit destHeadCommit = walk.parseCommit(git.getRepository().resolve("remotes/origin/" 
+			        		+ parseBranch(destBranchName)));
+					
+					List<RevCommit> startPoints = new ArrayList<RevCommit>();
+					walk.setRevFilter(RevFilter.MERGE_BASE);
+					startPoints.add(destHeadCommit);
+					startPoints.add(srcHeadCommit);
+	
+					walk.markStart(startPoints);
+					RevCommit forkPoint = walk.next();
+					
+		            ObjectReader reader = git.getRepository().newObjectReader();
+		            CanonicalTreeParser srcTreeIter = new CanonicalTreeParser();
+		            srcTreeIter.reset(reader, srcHeadCommit.getTree());
+		            
+		            CanonicalTreeParser destTreeIter = new CanonicalTreeParser();
+		            destTreeIter.reset(reader, forkPoint.getTree());
 
-		        List<DiffEntry> diff = git
-		        		.diff()
-		        		.setOldTree(oldTreeParser)
-		        		.setNewTree(newTreeParser)
-		        		.call();
-		        
-		        for (DiffEntry diffEntry : diff) {
-		        	VCSDiffEntry vcsEntry = new VCSDiffEntry(
-		        			diffEntry.getPath(diffEntry.getChangeType() == ChangeType.ADD ? Side.NEW : Side.OLD), 
-		        			gitChangeTypeToVCSChangeType(diffEntry.getChangeType()));
-		        	res.add(vcsEntry);
+		            List<DiffEntry> diffs = git
+		            		.diff()
+		                    .setNewTree(srcTreeIter)
+		                    .setOldTree(destTreeIter)
+		                    .call();
+		            
+		            for (DiffEntry diffEntry : diffs) {
+			        	VCSDiffEntry vcsEntry = new VCSDiffEntry(
+			        			diffEntry.getPath(diffEntry.getChangeType() == ChangeType.ADD ? Side.NEW : Side.OLD), 
+			        			gitChangeTypeToVCSChangeType(diffEntry.getChangeType()));
+			        	res.add(vcsEntry);
+			        }
 		        }
+	            
 		        git.getRepository().close();
 		        return res;
 			}
-		} catch (GitAPIException e) {
+		} catch (GitAPIException e) { 
 			throw new EVCSException(e);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 		
 	}
-	
-	private AbstractTreeIterator prepareTreeParser(Repository repository, String ref) throws Exception {
-		Ref head = repository.exactRef(ref);
-		try (RevWalk walk = new RevWalk(repository)) {
-		    RevCommit commit = walk.parseCommit(head.getObjectId());
-		    RevTree tree = walk.parseTree(commit.getTree().getId());
-		
-		    CanonicalTreeParser oldTreeParser = new CanonicalTreeParser();
-		    try (ObjectReader oldReader = repository.newObjectReader()) {
-		        oldTreeParser.reset(oldReader, tree.getId());
-		    }
-		
-		    walk.dispose();
-		
-		    return oldTreeParser;
-		}
-	}
-	
+
 	private VCSChangeType gitChangeTypeToVCSChangeType(ChangeType changeType) {
 		switch (changeType) {
 		case ADD:
@@ -474,12 +477,14 @@ public class GitVCS implements IVCS {
 	public List<String> getCommitMessages(String branchName, Integer limit) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 			try (Git git = getLocalGit(wc)) {
+				
 				Iterable<RevCommit> logs = git
 						.log()
 						.add(git.getRepository().resolve("remotes/origin/" 
 									+ parseBranch(branchName)))
 						.setMaxCount(limit)
 						.call();
+				
 				List<String> res = new ArrayList<>();
 				for (RevCommit commit : logs) {
 					res.add(commit.getFullMessage());
