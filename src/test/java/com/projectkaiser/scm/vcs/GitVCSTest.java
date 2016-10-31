@@ -102,6 +102,7 @@ public class GitVCSTest extends VCSAbstractTest {
 		if (PROXY_HOST != null) {
 			vcs.setProxy(PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS);
 		}
+		((GitVCS) vcs).setExpectedLatency(2000);
 		return vcs;
 	}
 

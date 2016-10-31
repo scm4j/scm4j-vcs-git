@@ -55,10 +55,19 @@ public class GitVCS implements IVCS {
 	private static final String MASTER_BRANCH_NAME = "master";
 	public static final String GIT_VCS_TYPE_STRING = "git";
 	private static final String REFS_REMOTES_ORIGIN = "refs/remotes/origin/";
+	private Integer expectedLatency = 0;
 
 	private CredentialsProvider credentials;
 	private IVCSRepositoryWorkspace repo;
 	
+	public Integer getExpectedLatency() {
+		return expectedLatency;
+	}
+
+	public void setExpectedLatency(Integer expectedLatency) {
+		this.expectedLatency = expectedLatency;
+	}
+
 	public CredentialsProvider getCredentials() {
 		return credentials;
 	}
@@ -100,7 +109,7 @@ public class GitVCS implements IVCS {
 								.setRefSpecs(refSpec)
 								.setCredentialsProvider(credentials)
 								.call();
-						Thread.sleep(2000); // github has some latency on branch operations
+						Thread.sleep(expectedLatency); // github has some latency on branch operations
 											// so next request branches operation will return old branches list
 					} finally {
 						git.getRepository().close();
@@ -152,7 +161,7 @@ public class GitVCS implements IVCS {
 							.setCredentialsProvider(credentials)
 							.call();
 					git.getRepository().close();
-					Thread.sleep(2000); // github has some latency on branch operations
+					Thread.sleep(expectedLatency); // github has some latency on branch operations
 										// so next request branches operation will return old branches list
 				}
 			}
@@ -196,7 +205,7 @@ public class GitVCS implements IVCS {
 	}
 
 	@Override
-	public VCSMergeResult merge(String sourceBranchUrl, String destBranchUrl, String commitMessage) {
+	public VCSMergeResult merge(String srcBranchName, String dstBranchName, String commitMessage) {
 		try {
 			try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 				try (Git git = getLocalGit(wc)) {
@@ -208,15 +217,15 @@ public class GitVCS implements IVCS {
 					
 					git
 							.checkout()
-							.setCreateBranch(git.getRepository().exactRef("refs/heads/" + parseBranch(destBranchUrl)) == null)
-							.setName(parseBranch(destBranchUrl))
+							.setCreateBranch(git.getRepository().exactRef("refs/heads/" + parseBranch(dstBranchName)) == null)
+							.setName(parseBranch(dstBranchName))
 							.call(); 
 			
 					MergeResult mr = git
 							.merge()
-							.include(git.getRepository().findRef("origin/" + parseBranch(sourceBranchUrl)))
+							.include(git.getRepository().findRef("origin/" + parseBranch(srcBranchName)))
 							.setMessage(commitMessage)
-							.call(); // actually do the merge
+							.call(); 
 			
 			
 					VCSMergeResult res = new VCSMergeResult();
@@ -388,7 +397,7 @@ public class GitVCS implements IVCS {
 	}
 
 	@Override
-	public List<VCSDiffEntry> getBranchesDiff(String srcBranchName, String destBranchName) {
+	public List<VCSDiffEntry> getBranchesDiff(String srcBranchName, String dstBranchName) {
 		List<VCSDiffEntry> res = new ArrayList<>();
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 			try (Git git = getLocalGit(wc)) {
@@ -397,7 +406,7 @@ public class GitVCS implements IVCS {
 			        RevCommit srcHeadCommit = walk.parseCommit(git.getRepository().resolve("remotes/origin/" 
 			        		+ parseBranch(srcBranchName)));
 			        RevCommit destHeadCommit = walk.parseCommit(git.getRepository().resolve("remotes/origin/" 
-			        		+ parseBranch(destBranchName)));
+			        		+ parseBranch(dstBranchName)));
 					
 					List<RevCommit> startPoints = new ArrayList<RevCommit>();
 					walk.setRevFilter(RevFilter.MERGE_BASE);
