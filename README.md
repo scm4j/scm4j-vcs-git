@@ -1,3 +1,5 @@
+[![Release](https://jitpack.io/v/ProjectKaiser/pk-vcs-git.svg)](https://jitpack.io/#ProjectKaiser/pk-vcs-git)	
+
 # Overview
 Pk-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) exposing IVCS implementation for Git repositories and [JGit](https://eclipse.org/jgit/) as framework to work with Git repositories.
 Features:
