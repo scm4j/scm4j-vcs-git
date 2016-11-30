@@ -21,7 +21,7 @@ Features:
   - Hosted on [Github](https://github.com/) using username and password provided by environment variables (see below)
   - Generates new before and deletes after each test
   - Named randomly (uuid is used) 
-  - [Kohsuke Github API](http://github-api.kohsuke.org/) is used as to work with Github API
+  - [Kohsuke Github API](http://github-api.kohsuke.org/) is used as to operate with Github API
 
 # Using pk-vcs-git
 - Add github-hosted pk-vcs-git project as maven dependency using [jitpack.io](https://jitpack.io/). As an example, add following to gradle.build file:
@@ -62,7 +62,7 @@ Features:
 - LWC is obtained for each vcs operation.
 - `getLocalGit(IVCSLockedWorkingCopy wc)` method is used to create a Git implementation to execute vcs operations within `wc` Working Copy
   - If provided LWC is empty then current Test Repository is cloned into this LWC, otherwise just Git object is created
-- If `IVCS.setProxy()` is called then provided proxy is used to each url which contains `repoUrl`
+- If `IVCS.setProxy()` is called then provided proxy is used for each url which contains `repoUrl`
 
 # Functional testing
 - Github is used for hosting the Test Repository

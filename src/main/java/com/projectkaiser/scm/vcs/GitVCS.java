@@ -1,5 +1,6 @@
 package com.projectkaiser.scm.vcs;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -28,12 +29,12 @@ import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
+import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
@@ -91,9 +92,9 @@ public class GitVCS implements IVCS {
 						git
 								.checkout()
 								.setCreateBranch(git.getRepository().exactRef("refs/heads/" + 
-											parseBranch(srcBranchName)) == null)
-								.setStartPoint("origin/" + parseBranch(srcBranchName))
-								.setName(parseBranch(srcBranchName))
+											getRealBranchName(srcBranchName)) == null)
+								.setStartPoint("origin/" + getRealBranchName(srcBranchName))
+								.setName(getRealBranchName(srcBranchName))
 								.call(); // switch to master
 					
 						git
@@ -125,7 +126,7 @@ public class GitVCS implements IVCS {
 		} 
 	}
 
-	private String parseBranch(String branchName) {
+	private String getRealBranchName(String branchName) {
 		return branchName == null ? MASTER_BRANCH_NAME : branchName;
 	}
 
@@ -217,13 +218,13 @@ public class GitVCS implements IVCS {
 					
 					git
 							.checkout()
-							.setCreateBranch(git.getRepository().exactRef("refs/heads/" + parseBranch(dstBranchName)) == null)
-							.setName(parseBranch(dstBranchName))
+							.setCreateBranch(git.getRepository().exactRef("refs/heads/" + getRealBranchName(dstBranchName)) == null)
+							.setName(getRealBranchName(dstBranchName))
 							.call(); 
 			
 					MergeResult mr = git
 							.merge()
-							.include(git.getRepository().findRef("origin/" + parseBranch(srcBranchName)))
+							.include(git.getRepository().findRef("origin/" + getRealBranchName(srcBranchName)))
 							.setMessage(commitMessage)
 							.call(); 
 			
@@ -305,7 +306,7 @@ public class GitVCS implements IVCS {
 	public String getFileContent(String branchName, String fileRelativePath, String encoding) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 			try (Git git = getLocalGit(wc)) {
-				String bn = parseBranch(branchName);
+				String bn = getRealBranchName(branchName);
 				git
 						.pull()
 						.setCredentialsProvider(credentials)
@@ -341,7 +342,7 @@ public class GitVCS implements IVCS {
 		try {
 			try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 				try (Git git = getLocalGit(wc)) {
-					String bn = parseBranch(branchName);
+					String bn = getRealBranchName(branchName);
 					
 					git
 							.pull()
@@ -395,48 +396,59 @@ public class GitVCS implements IVCS {
 	public String getFileContent(String branchName, String filePath) {
 		return getFileContent(branchName, filePath, StandardCharsets.UTF_8.name());
 	}
-
+	
 	@Override
 	public List<VCSDiffEntry> getBranchesDiff(String srcBranchName, String dstBranchName) {
 		List<VCSDiffEntry> res = new ArrayList<>();
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 			try (Git git = getLocalGit(wc)) {
 		        try (RevWalk walk = new RevWalk(git.getRepository())) {
-			        
-			        RevCommit srcHeadCommit = walk.parseCommit(git.getRepository().resolve("remotes/origin/" 
-			        		+ parseBranch(srcBranchName)));
 			        RevCommit destHeadCommit = walk.parseCommit(git.getRepository().resolve("remotes/origin/" 
-			        		+ parseBranch(dstBranchName)));
-					
-					List<RevCommit> startPoints = new ArrayList<RevCommit>();
-					walk.setRevFilter(RevFilter.MERGE_BASE);
-					startPoints.add(destHeadCommit);
-					startPoints.add(srcHeadCommit);
-	
-					walk.markStart(startPoints);
-					RevCommit forkPoint = walk.next();
-					
-		            ObjectReader reader = git.getRepository().newObjectReader();
-		            CanonicalTreeParser srcTreeIter = new CanonicalTreeParser();
-		            srcTreeIter.reset(reader, srcHeadCommit.getTree());
-		            
-		            CanonicalTreeParser destTreeIter = new CanonicalTreeParser();
-		            destTreeIter.reset(reader, forkPoint.getTree());
+			        		+ getRealBranchName(dstBranchName)));
 
+		            ObjectReader reader = git.getRepository().newObjectReader();
+					
+					git
+							.pull()
+							.setCredentialsProvider(credentials)
+							.call();
+					
+					git
+							.checkout()
+							.setCreateBranch(git.getRepository().exactRef("refs/heads/" + getRealBranchName(dstBranchName)) == null)
+							.setName(getRealBranchName(dstBranchName))
+							.setStartPoint(destHeadCommit)
+							.call(); 
+			
+					git
+							.merge()
+							.include(git.getRepository().findRef("origin/" + getRealBranchName(srcBranchName)))
+							.setCommit(false)
+							.call(); 
+			
+					CanonicalTreeParser srcTreeIter = new CanonicalTreeParser();
+		            srcTreeIter.reset(reader, destHeadCommit.getTree());
+	                
 		            List<DiffEntry> diffs = git
 		            		.diff()
-		                    .setNewTree(srcTreeIter)
-		                    .setOldTree(destTreeIter)
+		            		.setOldTree(srcTreeIter)
 		                    .call();
 		            
 		            for (DiffEntry diffEntry : diffs) {
 			        	VCSDiffEntry vcsEntry = new VCSDiffEntry(
 			        			diffEntry.getPath(diffEntry.getChangeType() == ChangeType.ADD ? Side.NEW : Side.OLD), 
 			        			gitChangeTypeToVCSChangeType(diffEntry.getChangeType()));
+			        	
+			        	
+			        	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			        	try (DiffFormatter formatter = new DiffFormatter(baos)) {
+	                        formatter.setRepository(git.getRepository());
+	                        formatter.format(diffEntry);
+	                    }
+			        	vcsEntry.setUnifiedDiff(baos.toString("UTF-8"));
 			        	res.add(vcsEntry);
 			        }
 		        }
-	            
 		        git.getRepository().close();
 		        return res;
 			}
@@ -445,9 +457,8 @@ public class GitVCS implements IVCS {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		
 	}
-
+	
 	private VCSChangeType gitChangeTypeToVCSChangeType(ChangeType changeType) {
 		switch (changeType) {
 		case ADD:
@@ -490,7 +501,7 @@ public class GitVCS implements IVCS {
 				Iterable<RevCommit> logs = git
 						.log()
 						.add(git.getRepository().resolve("remotes/origin/" 
-									+ parseBranch(branchName)))
+									+ getRealBranchName(branchName)))
 						.setMaxCount(limit)
 						.call();
 				
@@ -517,7 +528,7 @@ public class GitVCS implements IVCS {
 	public void removeFile(String branchName, String filePath, String commitMessage) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 			try (Git git = getLocalGit(wc)) {
-				String bn = parseBranch(branchName);
+				String bn = getRealBranchName(branchName);
 				git
 						.pull()
 						.setCredentialsProvider(credentials)
