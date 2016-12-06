@@ -4,9 +4,9 @@
 Pk-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) exposing IVCS implementation for Git repositories and [JGit](https://eclipse.org/jgit/) as framework to work with Git repositories.
 Features:
 - Branch create and remove
-- Branch merge returning result (success or list of conflicted files)
+- Branch merge with result return (success or list of conflicted files)
 - Branch commits messages list
-- Summarized branch changes list
+- Summarized diff between branches
 - Branches list
 - File content getting and setting
 - File create and remove
@@ -73,7 +73,7 @@ Features:
   - `PK_VCS_TEST_GITHUB_PASS` environment var or JVM var is used as user password for access to Github
   - New Test Repository is created before each test and deletes automatically after each test
 - To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See  [pk-vcs-test](https://github.com/ProjectKaiser/pk-vcs-test) for details
-- NOTE: Github has some latency for exposing results of previously executed operations. For example if create a new branch and immediately check branches list then Github could return old branches list. 2 seconds awaiting is added for testing. Also if a test failed then try to execute it again. 
+- NOTE: Github has some latency for exposing results of previously executed operations. For example if create a new branch and immediately check branches list then Github could return old branches list. If a test is failed then try to execute it again. Also use `GitVCS.setExpectedLatency()` to set delay for 'dangerous' operations.
 
 # Limitations
 - Commit messages can not be attached to branch create and delete operations because Git does not exposes these operations as separate commits
