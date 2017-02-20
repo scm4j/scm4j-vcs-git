@@ -83,10 +83,12 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	@After
 	public void tearDown() {
-		try {
-			gitHubRepo.delete();
-		} catch (IOException e) {
-			// do not affect the test
+		if (gitHubRepo != null) {
+			try {
+				gitHubRepo.delete();
+			} catch (IOException e) {
+				// do not affect the test
+			}
 		}
 	}
 	

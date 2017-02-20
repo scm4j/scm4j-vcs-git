@@ -35,9 +35,11 @@ Features:
 	}
 	
 	dependencies {
+	 	// versioning: master-SNAPSHOT (lastest build, unstable), + (lastest release, stable) or certain version (e.g. 1.0)
 		compile 'com.github.ProjectKaiser:pk-vcs-git:master-SNAPSHOT'
 	}
 	```
+	Or download release jars from https://github.com/ProjectKaiser/pk-vcs-api/releases  
 - Create Workspace Home instance providing path to any folder as Workspace Home folder path. This folder will contain repositories folders (if different vcs or repositories are used)
 ```java
 	public static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "git-workspaces";
