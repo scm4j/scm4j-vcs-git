@@ -30,6 +30,7 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -55,20 +56,11 @@ public class GitVCS implements IVCS {
 
 	private static final String MASTER_BRANCH_NAME = "master";
 	public static final String GIT_VCS_TYPE_STRING = "git";
-	private static final String REFS_REMOTES_ORIGIN = "refs/remotes/origin/";
-	private Integer expectedLatency = 0;
-
+	private static final String REFS_REMOTES_ORIGIN = Constants.R_REMOTES + Constants.DEFAULT_REMOTE_NAME + "/";
+	
 	private CredentialsProvider credentials;
 	private IVCSRepositoryWorkspace repo;
 	
-	public Integer getExpectedLatency() {
-		return expectedLatency;
-	}
-
-	public void setExpectedLatency(Integer expectedLatency) {
-		this.expectedLatency = expectedLatency;
-	}
-
 	public CredentialsProvider getCredentials() {
 		return credentials;
 	}
@@ -110,8 +102,6 @@ public class GitVCS implements IVCS {
 								.setRefSpecs(refSpec)
 								.setCredentialsProvider(credentials)
 								.call();
-						Thread.sleep(expectedLatency); // github has some latency on branch operations
-											// so next request branches operation will return old branches list
 					} finally {
 						git.getRepository().close();
 					}
@@ -162,8 +152,6 @@ public class GitVCS implements IVCS {
 							.setCredentialsProvider(credentials)
 							.call();
 					git.getRepository().close();
-					Thread.sleep(expectedLatency); // github has some latency on branch operations
-										// so next request branches operation will return old branches list
 				}
 			}
 		} catch (GitAPIException e) {
@@ -174,7 +162,6 @@ public class GitVCS implements IVCS {
 	}
 
 	public Git getLocalGit(IVCSLockedWorkingCopy wc) {
-		
 		Repository gitRepo;
 		try {
 			gitRepo = new FileRepositoryBuilder()
@@ -186,6 +173,7 @@ public class GitVCS implements IVCS {
 		Boolean repoInited = gitRepo
 				.getObjectDatabase()
 				.exists();
+		Git git = new Git(gitRepo);
 		if (!repoInited) {
 			try {
 				Git
@@ -194,15 +182,16 @@ public class GitVCS implements IVCS {
 						.setURI(repo.getRepoUrl())
 						.setCredentialsProvider(credentials)
 						.setNoCheckout(true)
+						.setBranch(Constants.R_HEADS + Constants.MASTER)
 						.call()
 						.close();
-			} catch (GitAPIException e) {
+				return git; 
+			} catch (Exception e) {
 				throw new EVCSException(e);
+				
 			}
-			
 		}
-		Git res = new Git(gitRepo);
-		return res; 
+		return git;
 	}
 
 	@Override
@@ -231,11 +220,11 @@ public class GitVCS implements IVCS {
 			
 					VCSMergeResult res = new VCSMergeResult();
 					
-					res.setSuccess(!mr.getMergeStatus().equals(MergeResult.MergeStatus.CONFLICTING) &&
+					res.setSuccess(
+							!mr.getMergeStatus().equals(MergeResult.MergeStatus.CONFLICTING) &&
 							!mr.getMergeStatus().equals(MergeResult.MergeStatus.FAILED) && 
 							!mr.getMergeStatus().equals(MergeResult.MergeStatus.ABORTED) &&
 							!mr.getMergeStatus().equals(MergeResult.MergeStatus.NOT_SUPPORTED));
-					
 					
 					if (!res.getSuccess()) {
 						res.getConflictingFiles().addAll(mr.getConflicts().keySet());
@@ -348,12 +337,14 @@ public class GitVCS implements IVCS {
 							.pull()
 							.setCredentialsProvider(credentials)
 							.call();
-			
+					
 					git
 							.checkout()
 							.setCreateBranch(git.getRepository().exactRef("refs/heads/" + bn) == null)
 							.setName(bn)
 							.call();
+					
+					
 					
 					File file = new File(wc.getFolder(), filePath);
 					if (!file.exists()) {
