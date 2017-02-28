@@ -25,7 +25,7 @@ Features:
   - Named randomly (uuid is used) 
 
 # Using pk-vcs-git
-- Add github-hosted pk-vcs-git project as maven dependency using [jitpack.io](https://jitpack.io/). As an example, add following to gradle.build file:
+- Add github-hosted pk-vcs-git and pk-vcs-api projects as maven dependencies using [jitpack.io](https://jitpack.io/). As an example, add following to gradle.build file:
 	```gradle
 	allprojects {
 		repositories {
@@ -34,11 +34,12 @@ Features:
 	}
 	
 	dependencies {
-	 	// versioning: master-SNAPSHOT (lastest build, unstable), + (lastest release, stable) or certain version (e.g. 1.0)
+	 	// versioning: master-SNAPSHOT (lastest build, unstable), + (lastest release, stable) or certain version (e.g. 1.1)
 		compile 'com.github.ProjectKaiser:pk-vcs-git:+'
+		compile 'com.github.ProjectKaiser:pk-vcs-api:+'
 	}
 	```
-	Or download release jars from https://github.com/ProjectKaiser/pk-vcs-git/releases  
+	Or download release jars from https://github.com/ProjectKaiser/pk-vcs-git/releases, https://github.com/ProjectKaiser/pk-vcs-api/releases  
 - Create Workspace Home instance providing path to any folder as Workspace Home folder path. This folder will contain repositories folders (if different vcs or repositories are used)
 ```java
 	public static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "git-workspaces";
