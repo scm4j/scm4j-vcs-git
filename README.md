@@ -20,10 +20,9 @@ Features:
   - Folder where vcs-related operations are executed. Provides thread- and process-safe repository of working folders. See [pk-vcs-api](https://github.com/ProjectKaiser/pk-vcs-api) for details
 - Test Repository
   - Git repository which is used to execute functional tests
-  - Hosted on [Github](https://github.com/) using username and password provided by environment variables (see below)
+  - File-based repository is used
   - Generates new before and deletes after each test
   - Named randomly (uuid is used) 
-  - [Kohsuke Github API](http://github-api.kohsuke.org/) is used as to operate with Github API
 
 # Using pk-vcs-git
 - Add github-hosted pk-vcs-git project as maven dependency using [jitpack.io](https://jitpack.io/). As an example, add following to gradle.build file:
@@ -68,12 +67,9 @@ Features:
 - If `IVCS.setProxy()` is called then provided proxy is used for each url which contains `repoUrl`
 
 # Functional testing
-- Github is used for hosting the Test Repository
-  - [Kohsuke Github API](http://github-api.kohsuke.org/) is used to create and delete Test Repository
-  - `PK_VCS_TEST_GITHUB_USER` environment var or JVM var is used as username for access to Github
-  - `PK_VCS_TEST_GITHUB_PASS` environment var or JVM var is used as user password for access to Github
-  - New Test Repository is created before each test and deletes automatically after each test
+- New local file-based Test Repository is created before each test and deletes automatically after each test
 - To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See  [pk-vcs-test](https://github.com/ProjectKaiser/pk-vcs-test) for details
+- Run `gradle test` to execute tests
 
 # Limitations
 - Commit messages can not be attached to branch create and delete operations because Git does not exposes these operations as separate commits
