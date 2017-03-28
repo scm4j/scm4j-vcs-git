@@ -68,7 +68,7 @@ Features:
 
 # Functional testing
 - New local file-based Test Repository is created before each test and deletes automatically after each test
-- To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See [pk-vcs-test](https://github.com/ProjectKaiser/pk-vcs-test) for details
+- To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See  [pk-vcs-test](https://github.com/ProjectKaiser/pk-vcs-test) for details
 - Run `gradle test` to execute tests
 
 # Limitations

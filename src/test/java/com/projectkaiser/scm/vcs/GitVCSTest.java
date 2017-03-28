@@ -18,9 +18,23 @@ import com.projectkaiser.scm.vcs.api.abstracttest.VCSAbstractTest;
 import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 
 public class GitVCSTest extends VCSAbstractTest {
+	
+	private static final String GITHUB_USER = System.getProperty("PK_VCS_TEST_GITHUB_USER") == null ? 
+			System.getenv("PK_VCS_TEST_GITHUB_USER") : System.getProperty("PK_VCS_TEST_GITHUB_USER");
+	private static final String GITHUB_PASS = System.getProperty("PK_VCS_TEST_GITHUB_PASS") == null ? 
+			System.getenv("PK_VCS_TEST_GITHUB_PASS") : System.getProperty("PK_VCS_TEST_GITHUB_PASS");
 
+	private Git mockedGit;
 	private Repository localGitRepo;
 	private RuntimeException testGitResetException = new RuntimeException("test exeption on git.reset()");
+	
+	@BeforeClass
+	public static void setUpClass() {
+		assertTrue("Set PK_VCS_TEST_GITHUB_USER enviroment variable as user name of a valid github account to execute tests.", 
+				GITHUB_USER != null);
+		assertTrue("Set PK_VCS_TEST_GITHUB_PASS enviroment variable as user password of a valid github account to execute tests.", 
+				GITHUB_PASS != null);
+	}
 	
 	@Override
 	public void setUp() throws Exception {
@@ -56,7 +70,6 @@ public class GitVCSTest extends VCSAbstractTest {
 
 	@Override
 	protected void setMakeFailureOnVCSReset(Boolean doMakeFailure) {
-		Git mockedGit;
 		if (doMakeFailure) {
 			mockedGit = Mockito.spy(((GitVCS) vcs).getLocalGit(mockedLWC));
 			Mockito.doReturn(mockedGit).when((GitVCS) vcs).getLocalGit(mockedLWC);

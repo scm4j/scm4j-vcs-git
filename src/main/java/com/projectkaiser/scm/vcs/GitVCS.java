@@ -11,7 +11,11 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -55,7 +59,7 @@ public class GitVCS implements IVCS {
 	private static final String REFS_REMOTES_ORIGIN = Constants.R_REMOTES + Constants.DEFAULT_REMOTE_NAME + "/";
 	
 	private CredentialsProvider credentials;
-	private final IVCSRepositoryWorkspace repo;
+	private IVCSRepositoryWorkspace repo;
 	
 	public CredentialsProvider getCredentials() {
 		return credentials;
@@ -265,10 +269,10 @@ public class GitVCS implements IVCS {
 			@Override
 			public List<Proxy> select(URI uri) {
 				if (uri.toString().toLowerCase().contains(repo.getRepoUrl().toLowerCase())) {
-					return Collections.singletonList(new Proxy(Type.HTTP, InetSocketAddress
-							.createUnresolved(host, port)));
+					return Arrays.asList(new Proxy(Type.HTTP, InetSocketAddress
+		                    .createUnresolved(host, port)));
 				} else {
-					return delegate == null ? Collections.singletonList(Proxy.NO_PROXY)
+					return delegate == null ? Arrays.asList(Proxy.NO_PROXY)
 			                : delegate.select(uri);
 				}
 			}
