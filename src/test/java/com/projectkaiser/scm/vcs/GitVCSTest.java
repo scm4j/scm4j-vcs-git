@@ -1,8 +1,6 @@
 package com.projectkaiser.scm.vcs;
 
 
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 
@@ -10,7 +8,6 @@ import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Repository;
 import org.junit.After;
-import org.junit.BeforeClass;
 import org.mockito.Mockito;
 
 import com.projectkaiser.scm.vcs.api.IVCS;
