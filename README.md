@@ -25,7 +25,7 @@ Features:
   - Named randomly (uuid is used) 
 
 # Using scm4j-vcs-git
-- Add github-hosted scm4j-vcs-git and scm4j-vcs-api projects as maven dependencies using [jitpack.io](https://jitpack.io/). As an example, add following to gradle.build file:
+- Add github-hosted scm4j-vcs-git project as maven dependency using [jitpack.io](https://jitpack.io/). As an example, add following to gradle.build file:
 	```gradle
 	allprojects {
 		repositories {
@@ -48,7 +48,7 @@ Features:
 ```
 - Obtain Repository Workspace from Workspace Home providing a certain Repository's url. The obtained Repository Workspace will represent a folder within Workspace Home dir which will contain all Working Copies relating to the provided VCS Repository  
 ```java
-	String repoUrl = "https://github.com/ProjectKaiser/scm4j-vcs-api";
+	String repoUrl = "https://github.com/MyUser/MyRepo";
 	IVCSRepositoryWorkspace repoWorkspace = workspace.getVCSRepositoryWorkspace(repoUrl);
 ```
 - Create `GitVCS` instance providing Repository Workspace
