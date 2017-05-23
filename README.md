@@ -1,7 +1,7 @@
-[![Release](https://jitpack.io/v/ProjectKaiser/scm4j-vcs-git.svg)](https://jitpack.io/#ProjectKaiser/scm4j-vcs-git)	
+[![Release](https://jitpack.io/v/scm4j/scm4j-vcs-git.svg)](https://jitpack.io/#scm4j/scm4j-vcs-git)	
 
 # Overview
-scm4j-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [scm4j-vcs-api](https://github.com/ProjectKaiser/scm4j-vcs-api) exposing IVCS implementation for Git repositories and [JGit](https://eclipse.org/jgit/) as framework to work with Git repositories.
+scm4j-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) exposing IVCS implementation for Git repositories and [JGit](https://eclipse.org/jgit/) as framework to work with Git repositories.
 Features:
 - Branch create and remove
 - Branch merge with result return (success or list of conflicted files)
@@ -13,11 +13,11 @@ Features:
 
 # Terms
 - Workspace Home
-  - Home local folder of all folders used by vcs-related operations. See [scm4j-vcs-api](https://github.com/ProjectKaiser/scm4j-vcs-api) for details
+  - Home local folder of all folders used by vcs-related operations. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Repository Workspace
-  - Local folder for LWC folders related to Repository of one type. See [scm4j-vcs-api](https://github.com/ProjectKaiser/scm4j-vcs-api) for details
+  - Local folder for LWC folders related to Repository of one type. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Locked Working Copy, LWC
-  - Local folder where vcs-related operations are executed. Provides thread- and process-safe repository of working folders. See [scm4j-vcs-api](https://github.com/ProjectKaiser/scm4j-vcs-api) for details
+  - Local folder where vcs-related operations are executed. Provides thread- and process-safe repository of working folders. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Test Repository
   - Git repository which is used to execute functional tests
   - File-based repository is used
@@ -35,10 +35,10 @@ Features:
 	
 	dependencies {
 	 	// versioning: master-SNAPSHOT (lastest build, unstable), + (lastest release, stable) or certain version (e.g. 1.1)
-		compile 'com.github.ProjectKaiser:scm4j-vcs-git:+'
+		compile 'com.github.scm4j:scm4j-vcs-git:+'
 	}
 	```
-	Or download release jars from https://github.com/ProjectKaiser/scm4j-vcs-git/releases
+	Or download release jars from https://github.com/scm4j/scm4j-vcs-git/releases
 - Create Workspace Home instance providing path to any folder as Workspace Home folder path. This folder will contain repositories folders (if different vcs or repositories are used)
 ```java
 	public static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "git-workspaces";
@@ -55,7 +55,7 @@ Features:
 ```java
 	IVCS vcs = new GitVCS(repoWorkspace);
 ```
-- Use methods of `IVCS` interface. See [scm4j-vcs-api](https://github.com/ProjectKaiser/scm4j-vcs-api) for details
+- Use methods of `IVCS` interface. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Use `vcs.setProxy()` and `vcs.setCredentials()` if necessary
 
 # Implementation details
@@ -67,7 +67,7 @@ Features:
 
 # Functional testing
 - New local file-based Test Repository is created before each test and deletes automatically after each test
-- To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See [scm4j-vcs-test](https://github.com/ProjectKaiser/scm4j-vcs-test) for details
+- To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See [scm4j-vcs-test](https://github.com/scm4j/scm4j-vcs-test) for details
 - Run `gradle test` to execute tests
 
 # Limitations
