@@ -1,4 +1,4 @@
-package com.projectkaiser.scm.vcs;
+package org.scm4j.vcs;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -45,17 +45,17 @@ import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-
-import com.projectkaiser.scm.vcs.api.IVCS;
-import com.projectkaiser.scm.vcs.api.VCSChangeType;
-import com.projectkaiser.scm.vcs.api.VCSCommit;
-import com.projectkaiser.scm.vcs.api.VCSDiffEntry;
-import com.projectkaiser.scm.vcs.api.VCSMergeResult;
-import com.projectkaiser.scm.vcs.api.exceptions.EVCSBranchExists;
-import com.projectkaiser.scm.vcs.api.exceptions.EVCSException;
-import com.projectkaiser.scm.vcs.api.exceptions.EVCSFileNotFound;
-import com.projectkaiser.scm.vcs.api.workingcopy.IVCSLockedWorkingCopy;
-import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepositoryWorkspace;
+import org.scm4j.vcs.api.IVCS;
+import org.scm4j.vcs.api.VCSChangeType;
+import org.scm4j.vcs.api.VCSCommit;
+import org.scm4j.vcs.api.VCSDiffEntry;
+import org.scm4j.vcs.api.VCSMergeResult;
+import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
+import org.scm4j.vcs.api.exceptions.EVCSException;
+import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
+import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
+import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
+import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
 
 public class GitVCS implements IVCS {
 
@@ -618,8 +618,12 @@ public class GitVCS implements IVCS {
 		    RevCommit root = rw.parseCommit(headId);
 		    rw.sort(RevSort.REVERSE);
 		    rw.markStart(root);
-		    RevCommit res = rw.next();
-		    return res;
+			return rw.next();
 		}
+	}
+
+	@Override
+	public IVCSWorkspace getWorkspace() {
+		return repo.getWorkspace();
 	}
 }

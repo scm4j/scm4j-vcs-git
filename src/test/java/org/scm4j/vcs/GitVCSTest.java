@@ -1,4 +1,4 @@
-package com.projectkaiser.scm.vcs;
+package org.scm4j.vcs;
 
 
 import java.io.File;
@@ -9,15 +9,16 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Repository;
 import org.junit.After;
 import org.mockito.Mockito;
+import org.scm4j.vcs.GitVCS;
+import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 
-import com.projectkaiser.scm.vcs.api.IVCS;
-import com.projectkaiser.scm.vcs.api.abstracttest.VCSAbstractTest;
-import com.projectkaiser.scm.vcs.api.workingcopy.IVCSRepositoryWorkspace;
+import org.scm4j.vcs.api.IVCS;
+import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 
 public class GitVCSTest extends VCSAbstractTest {
 
 	private Repository localGitRepo;
-	private RuntimeException testGitResetException = new RuntimeException("test exeption on git.reset()");
+	private final RuntimeException testGitResetException = new RuntimeException("test exeption on git.reset()");
 	
 	@Override
 	public void setUp() throws Exception {
@@ -47,8 +48,7 @@ public class GitVCSTest extends VCSAbstractTest {
 
 	@Override
 	protected IVCS getVCS(IVCSRepositoryWorkspace mockedVCSRepo) {
-		IVCS vcs = Mockito.spy(new GitVCS(mockedVCSRepo));
-		return vcs;
+		return Mockito.spy(new GitVCS(mockedVCSRepo));
 	}
 
 	@Override
