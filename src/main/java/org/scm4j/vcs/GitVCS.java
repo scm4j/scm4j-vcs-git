@@ -45,7 +45,6 @@ import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-
 import org.scm4j.vcs.api.IVCS;
 import org.scm4j.vcs.api.VCSChangeType;
 import org.scm4j.vcs.api.VCSCommit;
@@ -56,6 +55,7 @@ import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
+import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
 
 public class GitVCS implements IVCS {
 
@@ -621,5 +621,10 @@ public class GitVCS implements IVCS {
 		    RevCommit res = rw.next();
 		    return res;
 		}
+	}
+
+	@Override
+	public IVCSWorkspace getWorkspace() {
+		return repo.getWorkspace();
 	}
 }
