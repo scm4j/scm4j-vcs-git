@@ -9,7 +9,6 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Repository;
 import org.junit.After;
 import org.mockito.Mockito;
-import org.scm4j.vcs.GitVCS;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 
 import org.scm4j.vcs.api.IVCS;
@@ -23,11 +22,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	@Override
 	public void setUp() throws Exception {
 		super.setUp();
-		Git git = Git
-				.init()
-				.setDirectory(new File(localVCSWorkspace.getHomeFolder(), repoName))
-				.setBare(false)
-				.call();
+		Git git = GitVCSUtils.createRepository(new File(localVCSWorkspace.getHomeFolder(), repoName));
 		localGitRepo = git.getRepository();
 		git
 				.commit()
