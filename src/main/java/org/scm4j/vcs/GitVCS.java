@@ -50,6 +50,7 @@ import org.scm4j.vcs.api.VCSChangeType;
 import org.scm4j.vcs.api.VCSCommit;
 import org.scm4j.vcs.api.VCSDiffEntry;
 import org.scm4j.vcs.api.VCSMergeResult;
+import org.scm4j.vcs.api.WalkDirection;
 import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
 import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
@@ -345,7 +346,7 @@ public class GitVCS implements IVCS {
 	}
 
 	@Override
-	public String setFileContent(String branchName, String filePath, String content, String commitMessage) {
+	public VCSCommit setFileContent(String branchName, String filePath, String content, String commitMessage) {
 		try {
 			try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
 				try (Git git = getLocalGit(wc)) {
@@ -377,7 +378,7 @@ public class GitVCS implements IVCS {
 					fw.write(content);
 					fw.close();
 					
-					RevCommit res = git
+					RevCommit newCommit = git
 							.commit()
 							.setOnly(filePath)
 							.setMessage(commitMessage)
@@ -392,8 +393,7 @@ public class GitVCS implements IVCS {
 							.setCredentialsProvider(credentials)
 							.call();
 					git.getRepository().close();
-					
-					return res.getName();
+					return new VCSCommit(newCommit.getName(), commitMessage, newCommit.getAuthorIdent().getName());
 				}
 			}
 		} catch (GitAPIException e) {
@@ -626,5 +626,82 @@ public class GitVCS implements IVCS {
 	@Override
 	public IVCSWorkspace getWorkspace() {
 		return repo.getWorkspace();
+	}
+
+	@Override
+	public List<VCSCommit> getCommitsRange(String branchName, String startFromCommitId, WalkDirection direction,
+			int limit) {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+			try (Git git = getLocalGit(wc)) {
+				String bn = getRealBranchName(branchName);
+				git
+						.checkout()
+						.setCreateBranch(git.getRepository().exactRef("refs/heads/" + bn) == null)
+						.setName(bn)
+						.call();
+				ObjectId sinceCommit;
+				ObjectId untilCommit;
+				if (direction == WalkDirection.ASC) {
+					sinceCommit = startFromCommitId == null ? 
+							getInitialCommit(git).getId() :
+							ObjectId.fromString(startFromCommitId);
+							
+					untilCommit = git.getRepository().exactRef("refs/heads/" + bn).getObjectId();
+				} else {
+					sinceCommit = startFromCommitId == null ? 
+							git.getRepository().exactRef("refs/heads/" + bn).getObjectId() :
+								ObjectId.fromString(startFromCommitId);
+					untilCommit = getInitialCommit(git).getId();
+				}
+
+				Iterable<RevCommit> commits;
+				commits = git
+						.log()
+						.addRange(sinceCommit, untilCommit)
+						.setMaxCount(limit)
+						.call();
+				
+				List<VCSCommit> res = new ArrayList<>();
+				for (RevCommit commit : commits) {
+					VCSCommit vcsCommit = new VCSCommit(commit.getName(), commit.getFullMessage(),
+							commit.getAuthorIdent().getName());
+					res.add(vcsCommit);
+				}
+				
+				Collections.reverse(res);
+				git.getRepository().close();
+				return res;
+			}
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public VCSCommit getHeadCommit(String branchName) {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy()) {
+			try (Git git = getLocalGit(wc)) {
+				try (RevWalk rw = new RevWalk(git.getRepository())) {
+					String bn = getRealBranchName(branchName);
+					git
+							.checkout()
+							.setCreateBranch(git.getRepository().exactRef("refs/heads/" + bn) == null)
+							.setName(bn)
+							.call();
+					Ref ref = git.getRepository().exactRef("refs/heads/" + bn);
+					ObjectId commitId = ref.getObjectId();
+					RevCommit commit = rw.parseCommit( commitId );
+					git.getRepository().close();
+					return new VCSCommit(commit.getName(), commit.getFullMessage(),
+							commit.getAuthorIdent().getName());
+				}
+			}
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 }
