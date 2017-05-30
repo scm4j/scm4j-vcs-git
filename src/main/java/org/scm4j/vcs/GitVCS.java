@@ -618,8 +618,7 @@ public class GitVCS implements IVCS {
 		    RevCommit root = rw.parseCommit(headId);
 		    rw.sort(RevSort.REVERSE);
 		    rw.markStart(root);
-		    RevCommit res = rw.next();
-		    return res;
+			return rw.next();
 		}
 	}
 
