@@ -703,4 +703,9 @@ public class GitVCS implements IVCS {
 			throw new RuntimeException(e);
 		}
 	}
+	
+	@Override
+	public String toString() {
+		return "GitVCS [url=" + repo.getRepoUrl() + "]";
+	}
 }
