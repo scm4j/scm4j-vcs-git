@@ -638,37 +638,48 @@ public class GitVCS implements IVCS {
 						.setCreateBranch(git.getRepository().exactRef("refs/heads/" + bn) == null)
 						.setName(bn)
 						.call();
+				
 				ObjectId sinceCommit;
-				ObjectId untilCommit;
 				if (direction == WalkDirection.ASC) {
 					sinceCommit = startFromCommitId == null ? 
 							getInitialCommit(git).getId() :
 							ObjectId.fromString(startFromCommitId);
-							
-					untilCommit = git.getRepository().exactRef("refs/heads/" + bn).getObjectId();
 				} else {
 					sinceCommit = startFromCommitId == null ? 
 							git.getRepository().exactRef("refs/heads/" + bn).getObjectId() :
 								ObjectId.fromString(startFromCommitId);
-					untilCommit = getInitialCommit(git).getId();
 				}
-
-				Iterable<RevCommit> commits;
-				commits = git
-						.log()
-						.addRange(sinceCommit, untilCommit)
-						.setMaxCount(limit)
-						.call();
 				
 				List<VCSCommit> res = new ArrayList<>();
-				for (RevCommit commit : commits) {
-					VCSCommit vcsCommit = new VCSCommit(commit.getName(), commit.getFullMessage(),
-							commit.getAuthorIdent().getName());
-					res.add(vcsCommit);
+				try (RevWalk rw = new RevWalk(git.getRepository())) {
+					Ref ref = git.getRepository().exactRef("refs/heads/" + bn);
+					ObjectId headComitId = ref.getObjectId();
+					RevCommit headCommit = rw.parseCommit( headComitId );
+					RevCommit startCommit = rw.parseCommit(sinceCommit);
+
+					rw.markStart(headCommit);
+					
+					RevCommit commit = rw.next();
+					while (commit != null) {
+						
+						VCSCommit vcsCommit = new VCSCommit(commit.getName(), commit.getFullMessage(),
+								commit.getAuthorIdent().getName());
+						res.add(vcsCommit);
+						if (commit.getName().equals(startCommit.getName())) {
+							break;
+						}
+						commit = rw.next();
+					}
 				}
 				
+				// в Git мы всегда идем от головы к заданному коммиту. Это значит, 
+				// maxCount всегда будет обрубать сверху, а не снизу
+				
 				Collections.reverse(res);
-				git.getRepository().close();
+				if (limit != 0) {
+					res = res.subList(0, limit);
+				}
+				
 				return res;
 			}
 		} catch (GitAPIException e) {
