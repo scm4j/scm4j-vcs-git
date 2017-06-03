@@ -617,33 +617,39 @@ public class GitVCS implements IVCS {
 					.setName(bn)
 					.call();
 
-			ObjectId sinceCommit;
-			if (direction == WalkDirection.ASC) {
-				sinceCommit = startFromCommitId == null ?
-						getInitialCommit(git).getId() :
-						ObjectId.fromString(startFromCommitId);
-			} else {
-				sinceCommit = startFromCommitId == null ?
-						gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
-						ObjectId.fromString(startFromCommitId);
-			}
-
 			List<VCSCommit> res = new ArrayList<>();
 			try (RevWalk rw = new RevWalk(gitRepo)) {
-				Ref ref = gitRepo.exactRef("refs/heads/" + bn);
-				ObjectId headComitId = ref.getObjectId();
-				RevCommit headCommit = rw.parseCommit( headComitId );
-				RevCommit startCommit = rw.parseCommit(sinceCommit);
+				RevCommit startCommit;
+				RevCommit endCommit;
+				if (direction == WalkDirection.ASC) {
+					Ref ref = gitRepo.exactRef("refs/heads/" + bn);
+					ObjectId headCommitId = ref.getObjectId();
+					startCommit = rw.parseCommit( headCommitId );
+					ObjectId sinceCommit = startFromCommitId == null ?
+							getInitialCommit(git).getId() :
+							ObjectId.fromString(startFromCommitId);
+					endCommit = rw.parseCommit(sinceCommit);
+				} else {
+					ObjectId sinceCommit = startFromCommitId == null ?
+							gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
+							ObjectId.fromString(startFromCommitId);
+					startCommit = rw.parseCommit( sinceCommit );
+					Ref ref = gitRepo.exactRef("refs/heads/" + bn);
+					ObjectId headCommitId = ref.getObjectId();
+					RevCommit root = rw.parseCommit(headCommitId);
+					rw.sort(RevSort.REVERSE);
+					rw.markStart(root);
+					endCommit = rw.next(); // initial commit
+				}
 
-				rw.markStart(headCommit);
+				rw.markStart(startCommit);
 
 				RevCommit commit = rw.next();
 				while (commit != null) {
-
 					VCSCommit vcsCommit = new VCSCommit(commit.getName(), commit.getFullMessage(),
 							commit.getAuthorIdent().getName());
 					res.add(vcsCommit);
-					if (commit.getName().equals(startCommit.getName())) {
+					if (commit.getName().equals(endCommit.getName())) {
 						break;
 					}
 					commit = rw.next();
