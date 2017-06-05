@@ -698,4 +698,10 @@ public class GitVCS implements IVCS {
 	public String toString() {
 		return "GitVCS [url=" + repo.getRepoUrl() + "]";
 	}
+
+	@Override
+	public Boolean fileExists(String branchName, String filePath) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }
