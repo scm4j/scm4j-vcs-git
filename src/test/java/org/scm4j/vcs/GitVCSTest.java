@@ -8,10 +8,11 @@ import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Repository;
 import org.junit.After;
+import org.junit.Ignore;
+import org.junit.Test;
 import org.mockito.Mockito;
-import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
-
 import org.scm4j.vcs.api.IVCS;
+import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 
 public class GitVCSTest extends VCSAbstractTest {
@@ -62,6 +63,13 @@ public class GitVCSTest extends VCSAbstractTest {
 	@Override
 	protected String getVCSTypeString() {
 		return GitVCS.GIT_VCS_TYPE_STRING;
+	}
+	
+	@Override 
+	@Test
+	@Ignore
+	public void testGetCommitsRange() {
+		
 	}
 }
 
