@@ -493,7 +493,7 @@ public class GitVCS implements IVCS {
 	}
 
 	@Override
-	public String removeFile(String branchName, String filePath, String commitMessage) {
+	public VCSCommit removeFile(String branchName, String filePath, String commitMessage) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
@@ -528,7 +528,7 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.call();
 
-			return res.getName();
+			return new VCSCommit(res.getName(), res.getFullMessage(), res.getAuthorIdent().getName());
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
