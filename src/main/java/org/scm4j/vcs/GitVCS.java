@@ -11,11 +11,7 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -30,16 +26,12 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.StopWalkException;
+import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.revwalk.*;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
@@ -557,7 +549,7 @@ public class GitVCS implements IVCS {
 					.call();
 
 			ObjectId sinceCommit = afterCommitId == null ?
-					getInitialCommit(git).getId() :
+					getInitialCommit(git, gitRepo, bn).getId() :
 					ObjectId.fromString(afterCommitId);
 
 			ObjectId untilCommit = untilCommitId == null ?
@@ -586,16 +578,15 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private RevObject getInitialCommit(Git git) throws Exception {
-		try (RevWalk rw = new RevWalk(git.getRepository())) {
-			AnyObjectId headId;
-		    headId = git.getRepository().resolve(Constants.HEAD);
-		    RevCommit root = rw.parseCommit(headId);
-		    rw.sort(RevSort.REVERSE);
-		    rw.markStart(root);
+	private RevCommit getInitialCommit(Git git, Repository gitRepo, String branchName) throws Exception {
+		try (RevWalk rw = new RevWalk(gitRepo)) {
+			Ref ref = gitRepo.exactRef("refs/heads/" + branchName);
+			ObjectId headCommitId = ref.getObjectId();
+			RevCommit root = rw.parseCommit(headCommitId);
+			rw.markStart(root);
+			rw.sort(RevSort.REVERSE);
 			return rw.next();
 		}
-
 	}
 
 	@Override
@@ -626,7 +617,7 @@ public class GitVCS implements IVCS {
 					ObjectId headCommitId = ref.getObjectId();
 					startCommit = rw.parseCommit( headCommitId );
 					ObjectId sinceCommit = startFromCommitId == null ?
-							getInitialCommit(git).getId() :
+							getInitialCommit(git, gitRepo, bn).getId() :
 							ObjectId.fromString(startFromCommitId);
 					endCommit = rw.parseCommit(sinceCommit);
 				} else {
@@ -634,12 +625,7 @@ public class GitVCS implements IVCS {
 							gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
 							ObjectId.fromString(startFromCommitId);
 					startCommit = rw.parseCommit( sinceCommit );
-					Ref ref = gitRepo.exactRef("refs/heads/" + bn);
-					ObjectId headCommitId = ref.getObjectId();
-					RevCommit root = rw.parseCommit(headCommitId);
-					rw.sort(RevSort.REVERSE);
-					rw.markStart(root);
-					endCommit = rw.next(); // initial commit
+					endCommit = getInitialCommit(git, gitRepo, bn);
 				}
 
 				rw.markStart(startCommit);
@@ -656,7 +642,9 @@ public class GitVCS implements IVCS {
 				}
 			}
 
-			Collections.reverse(res);
+			if (direction == WalkDirection.ASC) {
+				Collections.reverse(res);
+			}
 			if (limit != 0) {
 				res = res.subList(0, limit);
 			}
@@ -669,8 +657,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	@Override
-	public VCSCommit getHeadCommit(String branchName) {
+	private RevCommit getBranchHeadCommit (String branchName) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
@@ -684,14 +671,19 @@ public class GitVCS implements IVCS {
 					.call();
 			Ref ref = gitRepo.exactRef("refs/heads/" + bn);
 			ObjectId commitId = ref.getObjectId();
-			RevCommit commit = rw.parseCommit( commitId );
-			return new VCSCommit(commit.getName(), commit.getFullMessage(),
-					commit.getAuthorIdent().getName());
+			return rw.parseCommit( commitId );
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	@Override
+	public VCSCommit getHeadCommit(String branchName) {
+		RevCommit branchHeadCommit = getBranchHeadCommit(getRealBranchName(branchName));
+		return new VCSCommit(branchHeadCommit.getName(), branchHeadCommit.getFullMessage(),
+				branchHeadCommit.getAuthorIdent().getName());
 	}
 	
 	@Override
