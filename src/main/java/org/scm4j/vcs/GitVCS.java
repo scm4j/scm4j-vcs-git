@@ -11,7 +11,11 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -26,12 +30,14 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.StopWalkException;
-import org.eclipse.jgit.lib.*;
-import org.eclipse.jgit.revwalk.*;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
@@ -286,33 +292,36 @@ public class GitVCS implements IVCS {
 	public String getRepoUrl() {
 		return repo.getRepoUrl(); 
 	}
+	
+	private File getFileFromRepo(String branchName, String fileRelativePath, String encoding) {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+				 Git git = getLocalGit(wc);
+				 Repository gitRepo = git.getRepository()) {
+
+				String bn = getRealBranchName(branchName);
+				git
+						.pull()
+						.setCredentialsProvider(credentials)
+						.call();
+
+				git
+						.checkout()
+						.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
+						.addPath(fileRelativePath)
+						.setName(bn)
+						.call();
+
+				return new File(wc.getFolder(), fileRelativePath);
+			} catch (GitAPIException e) {
+				throw new EVCSException(e);
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+	}
 
 	@Override
 	public String getFileContent(String branchName, String fileRelativePath, String encoding) {
-		File file;
-		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
-			 Git git = getLocalGit(wc);
-			 Repository gitRepo = git.getRepository()) {
-
-			String bn = getRealBranchName(branchName);
-			git
-					.pull()
-					.setCredentialsProvider(credentials)
-					.call();
-
-			git
-					.checkout()
-					.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
-					.addPath(fileRelativePath)
-					.setName(bn)
-					.call();
-
-			file = new File(wc.getFolder(), fileRelativePath);
-		} catch (GitAPIException e) {
-			throw new EVCSException(e);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+		File file = getFileFromRepo(branchName, fileRelativePath, encoding);
 		if (!file.exists()) {
 			throw new EVCSFileNotFound(String.format("File %s is not found", fileRelativePath));
 		}
@@ -657,7 +666,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private RevCommit getBranchHeadCommit (String branchName) {
+	private RevCommit getHeadRevCommit (String branchName) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
@@ -681,7 +690,7 @@ public class GitVCS implements IVCS {
 
 	@Override
 	public VCSCommit getHeadCommit(String branchName) {
-		RevCommit branchHeadCommit = getBranchHeadCommit(getRealBranchName(branchName));
+		RevCommit branchHeadCommit = getHeadRevCommit(getRealBranchName(branchName));
 		return new VCSCommit(branchHeadCommit.getName(), branchHeadCommit.getFullMessage(),
 				branchHeadCommit.getAuthorIdent().getName());
 	}
@@ -693,7 +702,6 @@ public class GitVCS implements IVCS {
 
 	@Override
 	public Boolean fileExists(String branchName, String filePath) {
-		// TODO Auto-generated method stub
-		return null;
+		return getFileFromRepo(branchName, filePath,  StandardCharsets.UTF_8.name()).exists();
 	}
 }
