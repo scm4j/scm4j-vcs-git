@@ -15,6 +15,10 @@ public class GitVCSUtils {
 					.setDirectory(repoDir)
 					.setBare(false)
 					.call();
+			git
+					.commit()
+					.setMessage("Initial commit")
+					.call();
 			return git;
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
