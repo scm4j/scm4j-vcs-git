@@ -1,22 +1,5 @@
 package org.scm4j.vcs;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
-import java.net.Proxy.Type;
-import java.net.ProxySelector;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
@@ -30,11 +13,7 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -43,18 +22,22 @@ import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.scm4j.vcs.api.IVCS;
-import org.scm4j.vcs.api.VCSChangeType;
-import org.scm4j.vcs.api.VCSCommit;
-import org.scm4j.vcs.api.VCSDiffEntry;
-import org.scm4j.vcs.api.VCSMergeResult;
-import org.scm4j.vcs.api.WalkDirection;
+import org.scm4j.vcs.api.*;
 import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
 import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.*;
+import java.net.Proxy.Type;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class GitVCS implements IVCS {
 
@@ -293,7 +276,7 @@ public class GitVCS implements IVCS {
 		return repo.getRepoUrl(); 
 	}
 	
-	private File getFileFromRepo(String branchName, String fileRelativePath, String encoding) {
+	private File getFileFromRepo(String branchName, String fileRelativePath) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 				 Git git = getLocalGit(wc);
 				 Repository gitRepo = git.getRepository()) {
@@ -321,7 +304,7 @@ public class GitVCS implements IVCS {
 
 	@Override
 	public String getFileContent(String branchName, String fileRelativePath, String encoding) {
-		File file = getFileFromRepo(branchName, fileRelativePath, encoding);
+		File file = getFileFromRepo(branchName, fileRelativePath);
 		if (!file.exists()) {
 			throw new EVCSFileNotFound(String.format("File %s is not found", fileRelativePath));
 		}
@@ -556,7 +539,7 @@ public class GitVCS implements IVCS {
 					.call();
 
 			ObjectId sinceCommit = afterCommitId == null ?
-					getInitialCommit(git, gitRepo, bn).getId() :
+					getInitialCommit(gitRepo, bn).getId() :
 					ObjectId.fromString(afterCommitId);
 
 			ObjectId untilCommit = untilCommitId == null ?
@@ -585,7 +568,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private RevCommit getInitialCommit(Git git, Repository gitRepo, String branchName) throws Exception {
+	private RevCommit getInitialCommit(Repository gitRepo, String branchName) throws Exception {
 		try (RevWalk rw = new RevWalk(gitRepo)) {
 			Ref ref = gitRepo.exactRef("refs/heads/" + branchName);
 			ObjectId headCommitId = ref.getObjectId();
@@ -624,7 +607,7 @@ public class GitVCS implements IVCS {
 					ObjectId headCommitId = ref.getObjectId();
 					startCommit = rw.parseCommit( headCommitId );
 					ObjectId sinceCommit = startFromCommitId == null ?
-							getInitialCommit(git, gitRepo, bn).getId() :
+							getInitialCommit(gitRepo, bn).getId() :
 							ObjectId.fromString(startFromCommitId);
 					endCommit = rw.parseCommit(sinceCommit);
 				} else {
@@ -632,7 +615,7 @@ public class GitVCS implements IVCS {
 							gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
 							ObjectId.fromString(startFromCommitId);
 					startCommit = rw.parseCommit( sinceCommit );
-					endCommit = getInitialCommit(git, gitRepo, bn);
+					endCommit = getInitialCommit(gitRepo, bn);
 				}
 
 				rw.markStart(startCommit);
@@ -700,6 +683,6 @@ public class GitVCS implements IVCS {
 
 	@Override
 	public Boolean fileExists(String branchName, String filePath) {
-		return getFileFromRepo(branchName, filePath,  StandardCharsets.UTF_8.name()).exists();
+		return getFileFromRepo(branchName, filePath).exists();
 	}
 }
