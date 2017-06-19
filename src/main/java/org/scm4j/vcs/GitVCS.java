@@ -431,17 +431,15 @@ public class GitVCS implements IVCS {
 
 			List<VCSDiffEntry> res = new ArrayList<>();
 			for (DiffEntry diffEntry : diffs) {
-				VCSDiffEntry vcsEntry = new VCSDiffEntry(
-						diffEntry.getPath(diffEntry.getChangeType() == ChangeType.ADD ? Side.NEW : Side.OLD),
-						gitChangeTypeToVCSChangeType(diffEntry.getChangeType()));
-
-
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
 				try (DiffFormatter formatter = new DiffFormatter(baos)) {
 					formatter.setRepository(git.getRepository());
 					formatter.format(diffEntry);
 				}
-				vcsEntry.setUnifiedDiff(baos.toString("UTF-8"));
+				VCSDiffEntry vcsEntry = new VCSDiffEntry(
+						diffEntry.getPath(diffEntry.getChangeType() == ChangeType.ADD ? Side.NEW : Side.OLD),
+						gitChangeTypeToVCSChangeType(diffEntry.getChangeType()), 
+						baos.toString("UTF-8"));
 				res.add(vcsEntry);
 			}
 			return res;
