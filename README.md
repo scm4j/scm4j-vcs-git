@@ -41,14 +41,14 @@ Features:
 	```
 	Or download release jars from https://github.com/scm4j/scm4j-vcs-git/releases
 - Code snippet
-```java
+	```java
 	public static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "git-workspaces";
 	IVCSWorkspace workspace = new VCSWorkspace(WORKSPACE_DIR);
 	String repoUrl = "https://github.com/MyUser/MyRepo";
 	IVCSRepositoryWorkspace repoWorkspace = workspace.getVCSRepositoryWorkspace(repoUrl);
 	IVCS vcs = new GitVCS(repoWorkspace);
 	vcs.setCredentials("user", "password"); // if necessary
-```
+	```
 - Use methods of `IVCS` interface. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Use `vcs.setProxy()` and `vcs.setCredentials()` if necessary
 
