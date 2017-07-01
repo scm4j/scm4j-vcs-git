@@ -175,7 +175,7 @@ public class GitVCSTest extends VCSAbstractTest {
 		GitAPIException eApi = new GitAPIException("test git exception") {};
 		Exception eCommon = new Exception("test common exception");
 		for (Method m : IVCS.class.getDeclaredMethods()) {
-			Object[] params = new Object[m.getParameterCount()];
+			Object[] params = new Object[m.getParameterTypes().length];
 			Integer i = 0;
 			for (Class clazz : m.getParameterTypes()) {
 				params[i] = clazz.isPrimitive() ? 0: null;
