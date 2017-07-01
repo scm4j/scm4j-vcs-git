@@ -91,31 +91,31 @@ public class GitVCSTest extends VCSAbstractTest {
 
 	@Test
 	public void testProxyAuth() throws Exception {
-		PasswordAuthentication initialAuth = Authenticator.requestPasswordAuthentication(InetAddress.getByName("127.0.0.1"),
+		PasswordAuthentication initialAuth = Authenticator.requestPasswordAuthentication(InetAddress.getByName("localhost"),
 				123, "http", "", "");
-		IVCS vcs = new GitVCS(localVCSWorkspace.getVCSRepositoryWorkspace("127.0.0.1"));
-		vcs.setProxy("127.0.0.1", 123, "username", "pwd");
+		IVCS vcs = new GitVCS(localVCSWorkspace.getVCSRepositoryWorkspace("localhost"));
+		vcs.setProxy("localhost", 123, "username", "pwd");
 
 		PasswordAuthentication resultAuth = Authenticator.requestPasswordAuthentication(
-				InetAddress.getByName("127.0.0.1"), 123, "http", "", "");
+				InetAddress.getByName("localhost"), 123, "http", "", "");
 		assertEquals(resultAuth.getUserName(), "username");
 		assertEquals(new String(resultAuth.getPassword()), "pwd");
 
 		resultAuth = Authenticator.requestPasswordAuthentication(
-				InetAddress.getByName("localhost"), 123, "http", "", "");
+				InetAddress.getByName("localhost"), 124, "http", "", "");
 		assertEquals(resultAuth, initialAuth);
 	}
 
 	@Test
 	public void testProxySelector() throws URISyntaxException {
-		vcs.setProxy("127.0.0.1", 123, "username", "pwd");
+		vcs.setProxy("localhost", 123, "username", "pwd");
 		ProxySelector actualPS = ProxySelector.getDefault();
 		List<Proxy> proxies = actualPS.select(new URI(vcs.getRepoUrl()));
 		assertTrue(proxies.size() == 1);
 		Proxy actualP = proxies.get(0);
 		assertTrue(actualP.address() instanceof InetSocketAddress);
 		InetSocketAddress isa = (InetSocketAddress) actualP.address();
-		assertEquals(isa.getHostName(), "127.0.0.1");
+		assertEquals(isa.getHostName(), "localhost");
 		assertEquals(isa.getPort(), 123);
 	}
 
@@ -123,7 +123,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	public void testParentProxySelectorUsage() throws URISyntaxException {
 		ProxySelector mockedPS = Mockito.mock(ProxySelector.class);
 		ProxySelector.setDefault(mockedPS);
-		vcs.setProxy("127.0.0.1", 123, "username", "pwd");
+		vcs.setProxy("localhost", 123, "username", "pwd");
 		ProxySelector actualPS = ProxySelector.getDefault();
 		URI uri = new URI("http://unknown");
 		actualPS.select(uri);
@@ -133,7 +133,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	@Test
 	public void testNullProxySelector() throws URISyntaxException {
 		ProxySelector.setDefault(null);
-		vcs.setProxy("127.0.0.1", 123, "username", "pwd");
+		vcs.setProxy("localhost", 123, "username", "pwd");
 		ProxySelector actualPS = ProxySelector.getDefault();
 		List<Proxy> proxies = actualPS.select(new URI("http://unknown"));
 		assertTrue(proxies.size() == 1);
@@ -144,7 +144,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	public void testParentSelectorCallOnConnectFailed() throws URISyntaxException {
 		ProxySelector mockedPS = Mockito.mock(ProxySelector.class);
 		ProxySelector.setDefault(mockedPS);
-		vcs.setProxy("127.0.0.1", 123, "username", "pwd");
+		vcs.setProxy("localhost", 123, "username", "pwd");
 		ProxySelector actualPS = ProxySelector.getDefault();
 		URI testURI = new URI("http://proxy.net");
 		SocketAddress testSA = InetSocketAddress.createUnresolved("http://proxy.net", 123);
@@ -155,7 +155,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	@Test
 	public void testNoParentSelectorOnConnectFailed() throws URISyntaxException {
 		ProxySelector.setDefault(null);
-		vcs.setProxy("127.0.0.1", 123, "username", "pwd");
+		vcs.setProxy("localhost", 123, "username", "pwd");
 		ProxySelector actualPS = Mockito.spy(ProxySelector.getDefault());
 		URI testURI = new URI("http://proxy.net");
 		SocketAddress testSA = InetSocketAddress.createUnresolved("http://proxy.net", 123);

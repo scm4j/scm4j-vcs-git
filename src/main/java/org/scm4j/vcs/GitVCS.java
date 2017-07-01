@@ -264,7 +264,8 @@ public class GitVCS implements IVCS {
 			protected PasswordAuthentication getPasswordAuthentication() {
 				System.out.println(super.getRequestingSite().getHostName());
 				System.out.println(repo.getRepoUrl());
-				if (super.getRequestingSite().getHostName().contains(repo.getRepoUrl())) {
+				if (super.getRequestingSite().getHostName().contains(repo.getRepoUrl()) &&
+						super.getRequestingPort() == port) {
 					return new PasswordAuthentication(proxyUser, proxyPassword.toCharArray());
 				}
 				return super.getPasswordAuthentication();
