@@ -262,6 +262,8 @@ public class GitVCS implements IVCS {
 		Authenticator.setDefault(new Authenticator() {
 			@Override
 			protected PasswordAuthentication getPasswordAuthentication() {
+				System.out.println(super.getRequestingSite().getHostName());
+				System.out.println(repo.getRepoUrl());
 				if (super.getRequestingSite().getHostName().contains(repo.getRepoUrl())) {
 					return new PasswordAuthentication(proxyUser, proxyPassword.toCharArray());
 				}
