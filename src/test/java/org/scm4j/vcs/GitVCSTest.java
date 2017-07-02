@@ -181,13 +181,13 @@ public class GitVCSTest extends VCSAbstractTest {
 				params[i] = clazz.isPrimitive() ? 0: null;
 				i++;
 			}
-			testException(eApi, m, params);
+			testExceptionThrowing(eApi, m, params);
 
-			testException(eCommon, m, params);
+			testExceptionThrowing(eCommon, m, params);
 		}
 	}
 
-	private void testException(Exception testException, Method m, Object[] params) throws Exception {
+	private void testExceptionThrowing(Exception testException, Method m, Object[] params) throws Exception {
 		Mockito.reset((GitVCS) vcs);
 		Mockito.doThrow(testException).when((GitVCS) vcs).getLocalGit(mockedLWC);
 		try {
