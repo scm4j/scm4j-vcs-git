@@ -1,5 +1,6 @@
 [![Release](https://jitpack.io/v/scm4j/scm4j-vcs-git.svg)](https://jitpack.io/#scm4j/scm4j-vcs-git)
 [![Build Status](https://travis-ci.org/scm4j/scm4j-vcs-git.svg?branch=master)](https://travis-ci.org/scm4j/scm4j-vcs-git)
+[![Coverage Status](https://coveralls.io/repos/github/scm4j/scm4j-vcs-git/badge.svg?branch=master)](https://coveralls.io/github/scm4j/scm4j-vcs-git?branch=master)
 
 # Overview
 scm4j-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) exposing IVCS implementation for Git repositories and [JGit](https://eclipse.org/jgit/) as framework to work with Git repositories.
@@ -41,14 +42,14 @@ Features:
 	```
 	Or download release jars from https://github.com/scm4j/scm4j-vcs-git/releases
 - Code snippet
-```java
+	```java
 	public static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "git-workspaces";
 	IVCSWorkspace workspace = new VCSWorkspace(WORKSPACE_DIR);
 	String repoUrl = "https://github.com/MyUser/MyRepo";
 	IVCSRepositoryWorkspace repoWorkspace = workspace.getVCSRepositoryWorkspace(repoUrl);
 	IVCS vcs = new GitVCS(repoWorkspace);
 	vcs.setCredentials("user", "password"); // if necessary
-```
+	```
 - Use methods of `IVCS` interface. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Use `vcs.setProxy()` and `vcs.setCredentials()` if necessary
 

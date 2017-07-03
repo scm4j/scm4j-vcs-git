@@ -84,39 +84,29 @@ public class GitVCS implements IVCS {
 		return branchName == null ? MASTER_BRANCH_NAME : branchName;
 	}
 	
-	public Git getLocalGit(IVCSLockedWorkingCopy wc) {
-		Repository gitRepo;
-		try {
-			gitRepo = new FileRepositoryBuilder()
-					.setGitDir(new File(wc.getFolder(), ".git"))
-					.build();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+	public Git getLocalGit(IVCSLockedWorkingCopy wc) throws Exception {
+		Repository gitRepo = new FileRepositoryBuilder()
+				.setGitDir(new File(wc.getFolder(), ".git"))
+				.build();
+
 		Boolean repoInited = gitRepo
 				.getObjectDatabase()
 				.exists();
-		Git git = new Git(gitRepo);
 		if (!repoInited) {
-			try {
-				Git
-						.cloneRepository()
-						.setDirectory(wc.getFolder())
-						.setURI(repo.getRepoUrl())
-						.setCredentialsProvider(credentials)
-						.setNoCheckout(true)
-						.setBranch(Constants.R_HEADS + Constants.MASTER)
-						.call()
-						.close();
-				return git;
-			} catch (Exception e) {
-				throw new EVCSException(e);
-			}
+			Git
+					.cloneRepository()
+					.setDirectory(wc.getFolder())
+					.setURI(repo.getRepoUrl())
+					.setCredentialsProvider(credentials)
+					.setNoCheckout(true)
+					.setBranch(Constants.R_HEADS + Constants.MASTER)
+					.call()
+					.close();
 		}
-		return git;
+		return new Git(gitRepo);
 	}
 	
-	private VCSChangeType gitChangeTypeToVCSChangeType(ChangeType changeType) {
+	public VCSChangeType gitChangeTypeToVCSChangeType(ChangeType changeType) {
 		switch (changeType) {
 		case ADD:
 			return VCSChangeType.ADD;
@@ -262,11 +252,11 @@ public class GitVCS implements IVCS {
 
 	@Override
 	public void setCredentials(String user, String password) {
-		credentials = new UsernamePasswordCredentialsProvider(user, password);
+		setCredentials(new UsernamePasswordCredentialsProvider(user, password));
 	}
 
 	@Override
-	public void setProxy(final String host, final int port, String proxyUser, String proxyPassword) {
+	public void setProxy(final String host, final int port, final String proxyUser, final String proxyPassword) {
 		ProxySelector.setDefault(new ProxySelector() {
 			
 			final ProxySelector delegate = ProxySelector.getDefault();
@@ -284,9 +274,21 @@ public class GitVCS implements IVCS {
 			
 			@Override
 			public void connectFailed(URI uri, SocketAddress sa, IOException ioe) {
-				if (uri.toString().contains(repo.getRepoUrl())) {
-					throw new RuntimeException("GitVCS proxy connect failed");
+				if (delegate != null) {
+					delegate.connectFailed(uri, sa, ioe);
 				}
+			}
+		});
+		Authenticator.setDefault(new Authenticator() {
+			@Override
+			protected PasswordAuthentication getPasswordAuthentication() {
+				System.out.println(super.getRequestingSite().getHostName());
+				System.out.println(repo.getRepoUrl());
+				if (super.getRequestingSite().getHostName().contains(repo.getRepoUrl()) &&
+						super.getRequestingPort() == port) {
+					return new PasswordAuthentication(proxyUser, proxyPassword.toCharArray());
+				}
+				return super.getPasswordAuthentication();
 			}
 		});
 	}
