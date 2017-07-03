@@ -1,5 +1,22 @@
 package org.scm4j.vcs;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.Proxy.Type;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
@@ -13,31 +30,34 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.scm4j.vcs.api.*;
+import org.scm4j.vcs.api.IVCS;
+import org.scm4j.vcs.api.VCSChangeType;
+import org.scm4j.vcs.api.VCSCommit;
+import org.scm4j.vcs.api.VCSDiffEntry;
+import org.scm4j.vcs.api.VCSMergeResult;
+import org.scm4j.vcs.api.VCSTag;
+import org.scm4j.vcs.api.WalkDirection;
 import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
 import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
+import org.scm4j.vcs.api.exceptions.EVCSTagExists;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.*;
-import java.net.Proxy.Type;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
 
 public class GitVCS implements IVCS {
 
@@ -684,5 +704,81 @@ public class GitVCS implements IVCS {
 	@Override
 	public Boolean fileExists(String branchName, String filePath) {
 		return getFileFromRepo(branchName, filePath).exists();
+	}
+
+	@Override
+	public VCSTag createTag(String branchName, String tagName, String tagMessage) throws EVCSTagExists {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			
+			String bn = getRealBranchName(branchName);
+			
+			git
+					.checkout()
+					.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
+					.setName(bn)
+					.call();
+			
+			git
+					.pull()
+					.setCredentialsProvider(credentials)
+					.call();
+			
+			Ref ref = git
+					.tag()
+					.setAnnotated(true)
+					.setMessage(tagMessage)
+					.setName(tagName)
+					.setObjectId(null) //rw.gparseCommit(ObjectId.fromString(commitIdToTag))) 
+					.call();
+			
+			git
+					.push()
+					.setRefSpecs(new RefSpec(ref.getName()))
+					.setCredentialsProvider(credentials)
+					.call();
+			
+			
+			RevTag revTag = rw.parseTag(ref.getObjectId());
+			RevCommit revCommit = rw.parseCommit(ref.getObjectId());
+			VCSCommit relatedCommit = new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
+        	return new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
+		} catch(RefAlreadyExistsException e) {
+			throw new EVCSTagExists(e);
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public List<VCSTag> getTags() {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)	) {
+            List<Ref> refs = git
+            		.tagList()
+            		.call();
+            
+            RevTag revTag;
+            RevCommit revCommit;
+            List<VCSTag> res = new ArrayList<>();
+            for (Ref ref : refs) {
+            	revTag = rw.parseTag(ref.getObjectId());
+            	revCommit = rw.parseCommit(ref.getObjectId());
+            	VCSCommit relatedCommit = new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
+            	VCSTag tag = new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
+            	res.add(tag);
+            }
+            return res;
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 }
