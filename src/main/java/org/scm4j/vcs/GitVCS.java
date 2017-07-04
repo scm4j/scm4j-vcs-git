@@ -345,12 +345,12 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
 			String bn = getRealBranchName(branchName);
-
+			
 			git
 					.pull()
 					.setCredentialsProvider(credentials)
 					.call();
-
+			
 			git
 					.checkout()
 					.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
@@ -485,7 +485,7 @@ public class GitVCS implements IVCS {
 				
 			Iterable<RevCommit> logs = git
 					.log()
-					.add(gitRepo.resolve("remotes/origin/" + getRealBranchName(branchName)))
+					.add(gitRepo.resolve("refs/remotes/origin/" + getRealBranchName(branchName)))
 					.setMaxCount(limit)
 					.call();
 
@@ -513,6 +513,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository()) {
 
 			String bn = getRealBranchName(branchName);
+			
 			git
 					.pull()
 					.setCredentialsProvider(credentials)
@@ -678,12 +679,8 @@ public class GitVCS implements IVCS {
 			 RevWalk rw = new RevWalk(gitRepo)) {
 
 			String bn = getRealBranchName(branchName);
-			git
-					.checkout()
-					.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
-					.setName(bn)
-					.call();
-			Ref ref = gitRepo.exactRef("refs/heads/" + bn);
+			
+			Ref ref = gitRepo.exactRef("refs/remotes/origin/" + bn);
 			ObjectId commitId = ref.getObjectId();
 			return rw.parseCommit( commitId );
 		} catch (GitAPIException e) {
@@ -763,7 +760,18 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
-			 RevWalk rw = new RevWalk(gitRepo)	) {
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			git
+					.checkout()
+					.setCreateBranch(gitRepo.exactRef("refs/heads/" + MASTER_BRANCH_NAME) == null)
+					.setName(MASTER_BRANCH_NAME)
+					.call();
+			
+			git
+					.pull()
+					.setCredentialsProvider(credentials)
+					.call();
+			
             List<Ref> refs = git
             		.tagList()
             		.call();
