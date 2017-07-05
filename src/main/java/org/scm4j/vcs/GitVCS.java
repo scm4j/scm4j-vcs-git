@@ -761,6 +761,29 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
+			List<Ref> tagRefs = getTagRefs();
+	        List<VCSTag> res = new ArrayList<>();
+	        RevTag revTag;
+	        RevCommit revCommit;
+	        for (Ref ref : tagRefs) {
+	        	revTag = rw.parseTag(ref.getObjectId());
+	        	revCommit = rw.parseCommit(ref.getObjectId());
+	        	VCSCommit relatedCommit = new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
+	        	VCSTag tag = new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
+	        	res.add(tag);
+	        }
+	        return res;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+       
+	}
+	
+	private List<Ref> getTagRefs() throws Exception {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
 			git
 					.checkout()
 					.setCreateBranch(gitRepo.exactRef("refs/heads/" + MASTER_BRANCH_NAME) == null)
@@ -776,17 +799,25 @@ public class GitVCS implements IVCS {
             		.tagList()
             		.call();
             
+          return refs;
+		} 
+	}
+
+	@Override
+	public VCSTag getLastTag() {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			
+			List<Ref> tagRefs = getTagRefs();
             RevTag revTag;
             RevCommit revCommit;
-            List<VCSTag> res = new ArrayList<>();
-            for (Ref ref : refs) {
-            	revTag = rw.parseTag(ref.getObjectId());
-            	revCommit = rw.parseCommit(ref.getObjectId());
-            	VCSCommit relatedCommit = new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
-            	VCSTag tag = new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
-            	res.add(tag);
-            }
-            return res;
+            Ref ref = tagRefs.get(0);
+        	revTag = rw.parseTag(ref.getObjectId());
+        	revCommit = rw.parseCommit(ref.getObjectId());
+        	VCSCommit relatedCommit = new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
+        	return new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
