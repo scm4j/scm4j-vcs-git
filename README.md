@@ -1,6 +1,6 @@
 [![Release](https://jitpack.io/v/scm4j/scm4j-vcs-git.svg)](https://jitpack.io/#scm4j/scm4j-vcs-git)
-[![Build Status](https://travis-ci.org/scm4j/scm4j-vcs-git.svg?branch=develop)](https://travis-ci.org/scm4j/scm4j-vcs-git)
-[![Coverage Status](https://coveralls.io/repos/github/scm4j/scm4j-vcs-git/badge.svg?branch=develop)](https://coveralls.io/github/scm4j/scm4j-vcs-git?branch=develop)
+[![Build Status](https://travis-ci.org/scm4j/scm4j-vcs-git.svg?branch=master)](https://travis-ci.org/scm4j/scm4j-vcs-git)
+[![Coverage Status](https://coveralls.io/repos/github/scm4j/scm4j-vcs-git/badge.svg?branch=master)](https://coveralls.io/github/scm4j/scm4j-vcs-git?branch=master)
 
 # Overview
 scm4j-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) exposing IVCS implementation for Git repositories and [JGit](https://eclipse.org/jgit/) as framework to work with Git repositories.
