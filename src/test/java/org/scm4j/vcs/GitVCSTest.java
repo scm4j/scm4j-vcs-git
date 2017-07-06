@@ -1,25 +1,5 @@
 package org.scm4j.vcs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.Authenticator;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.PasswordAuthentication;
-import java.net.Proxy;
-import java.net.ProxySelector;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.IllegalCharsetNameException;
-import java.util.List;
-
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -34,6 +14,16 @@ import org.scm4j.vcs.api.IVCS;
 import org.scm4j.vcs.api.VCSChangeType;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.*;
+import java.nio.charset.IllegalCharsetNameException;
+import java.util.List;
+
+import static org.junit.Assert.*;
 
 public class GitVCSTest extends VCSAbstractTest {
 
@@ -247,7 +237,7 @@ public class GitVCSTest extends VCSAbstractTest {
 
 	@Test
 	public void testGitVCSUtilsCreation() {
-		new GitVCSUtils();
+		assertNotNull(new GitVCSUtils());
 	}
 
 }
