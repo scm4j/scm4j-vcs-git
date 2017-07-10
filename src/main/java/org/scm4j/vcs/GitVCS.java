@@ -35,7 +35,7 @@ import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef.PeeledNonTag;
+import org.eclipse.jgit.lib.ObjectIdRef.Unpeeled;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -732,6 +732,7 @@ public class GitVCS implements IVCS {
 				//.setRemote(repo.getRepoUrl())
 				//.setCredentialsProvider(credentials)
 				//.call());
+		}
 	}
 
 	@Override
@@ -753,7 +754,7 @@ public class GitVCS implements IVCS {
             Ref ref = tagRefs.get(tagRefs.size() - 1);
             RevCommit revCommit = rw.parseCommit(ref.getObjectId());
             VCSCommit relatedCommit = new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
-            if (ref instanceof PeeledNonTag) {
+            if (ref instanceof Unpeeled) {
             	return new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
             }
         	RevTag revTag = rw.parseTag(ref.getObjectId());
