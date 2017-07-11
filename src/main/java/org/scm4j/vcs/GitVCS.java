@@ -153,22 +153,18 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-			//try {
 
-				checkout(git, gitRepo, MASTER_BRANCH_NAME);
+			checkout(git, gitRepo, MASTER_BRANCH_NAME);
 
-				git
-						.branchDelete()
-						.setBranchNames(branchName)
-						.setForce(true) // avoid "not merged" exception
-						.call();
-	
-				RefSpec refSpec = new RefSpec( ":refs/heads/" + branchName);
-				
-				push(git, refSpec);
-//			} finally {
-//				git.getRepository().close();
-//			}
+			git
+					.branchDelete()
+					.setBranchNames(branchName)
+					.setForce(true) // avoid "not merged" exception
+					.call();
+
+			RefSpec refSpec = new RefSpec( ":refs/heads/" + branchName);
+			
+			push(git, refSpec);
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
