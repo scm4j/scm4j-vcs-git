@@ -35,7 +35,6 @@ import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef.Unpeeled;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -45,7 +44,6 @@ import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
-import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
@@ -155,21 +153,22 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-			try {
+			//try {
 
 				checkout(git, gitRepo, MASTER_BRANCH_NAME);
 
-			git
-					.branchDelete()
-					.setBranchNames(branchName)
+				git
+						.branchDelete()
+						.setBranchNames(branchName)
 						.setForce(true) // avoid "not merged" exception
-					.call();
-
-			RefSpec refSpec = new RefSpec( ":refs/heads/" + branchName);
+						.call();
+	
+				RefSpec refSpec = new RefSpec( ":refs/heads/" + branchName);
+				
 				push(git, refSpec);
-			} finally {
-			git.getRepository().close();
-			}
+//			} finally {
+//				git.getRepository().close();
+//			}
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -177,14 +176,14 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private Iterable<PushResult> push(Git git, RefSpec refSpec) throws GitAPIException {
+	private void push(Git git, RefSpec refSpec) throws GitAPIException {
 		PushCommand cmd =  git
 				.push()
 				.setPushAll();
 		if (refSpec != null) {
 			cmd.setRefSpecs(refSpec);
 		}
-		return cmd
+		cmd
 				.setRemote("origin")
 				.setCredentialsProvider(credentials)
 				.call();
@@ -347,7 +346,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private void checkout(Git git, Repository gitRepo, String branchName) throws Exception {
+	void checkout(Git git, Repository gitRepo, String branchName) throws Exception {
 		String bn = getRealBranchName(branchName);
 		git
 				.pull()
@@ -684,17 +683,6 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 			
-//			git
-//					.checkout()
-//					.setCreateBranch(gitRepo.exactRef("refs/heads/master") == null)
-//					.setName("master")
-//					.call();
-//			
-//			git
-//					.pull()
-//					.setCredentialsProvider(credentials)
-//					.call();
-			
 			List<Ref> tagRefs = getTagRefs();
 	        List<VCSTag> res = new ArrayList<>();
 	        RevTag revTag;
@@ -713,7 +701,7 @@ public class GitVCS implements IVCS {
        
 	}
 	
-	private List<Ref> getTagRefs() throws Exception {
+	List<Ref> getTagRefs() throws Exception {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
@@ -725,13 +713,6 @@ public class GitVCS implements IVCS {
             		.call();
             
           return refs;
-		//return new ArrayList<>(Git
-				//.lsRemoteRepository()
-				//.setTags(true)
-				//.setHeads(false)
-				//.setRemote(repo.getRepoUrl())
-				//.setCredentialsProvider(credentials)
-				//.call());
 		}
 	}
 
@@ -754,7 +735,7 @@ public class GitVCS implements IVCS {
             Ref ref = tagRefs.get(tagRefs.size() - 1);
             RevCommit revCommit = rw.parseCommit(ref.getObjectId());
             VCSCommit relatedCommit = new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
-            if (ref instanceof Unpeeled) {
+            if (git.getRepository().peel(ref).getPeeledObjectId() == null) {
             	return new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
             }
         	RevTag revTag = rw.parseTag(ref.getObjectId());

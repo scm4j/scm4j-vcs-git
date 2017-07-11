@@ -1,43 +1,63 @@
 package org.scm4j.vcs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.Authenticator;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.IllegalCharsetNameException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.CredentialItem;
+import org.eclipse.jgit.transport.RefSpec;
 import org.junit.After;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.exceptions.verification.WantedButNotInvoked;
 import org.scm4j.vcs.api.IVCS;
 import org.scm4j.vcs.api.VCSChangeType;
+import org.scm4j.vcs.api.VCSTag;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
+import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.*;
-import java.nio.charset.IllegalCharsetNameException;
-import java.util.List;
-
-import static org.junit.Assert.*;
 
 public class GitVCSTest extends VCSAbstractTest {
 
 	private Repository localGitRepo;
 	private ProxySelector proxySelectorBackup;
 	private final RuntimeException testGitResetException = new RuntimeException("test exception on git.reset()");
+	private GitVCS git;
 	
 	@Override
 	public void setUp() throws Exception {
 		super.setUp();
-		Git git = GitVCSUtils.createRepository(new File(localVCSWorkspace.getHomeFolder(), repoName));
-		localGitRepo = git.getRepository();
+		Git fileGitRepo = GitVCSUtils.createRepository(new File(localVCSWorkspace.getHomeFolder(), repoName));
+		localGitRepo = fileGitRepo.getRepository();
 		proxySelectorBackup = ProxySelector.getDefault();
 		ProxySelector.setDefault(null);
+		git = (GitVCS) vcs;
 	}
 	
 	@After
@@ -62,10 +82,10 @@ public class GitVCSTest extends VCSAbstractTest {
 		Git mockedGit;
 		if (doMakeFailure) {
 			mockedGit = Mockito.spy(((GitVCS) vcs).getLocalGit(mockedLWC));
-			Mockito.doReturn(mockedGit).when((GitVCS) vcs).getLocalGit(mockedLWC);
+			Mockito.doReturn(mockedGit).when(((GitVCS) vcs)).getLocalGit(mockedLWC);
 			Mockito.doThrow(testGitResetException).when(mockedGit).reset();
 		} else {
-			Mockito.doCallRealMethod().when((GitVCS) vcs).getLocalGit(mockedLWC);
+			Mockito.doCallRealMethod().when(((GitVCS) vcs)).getLocalGit(mockedLWC);
 			mockedGit = null;
 		}
 	}
@@ -80,7 +100,7 @@ public class GitVCSTest extends VCSAbstractTest {
 		vcs.setCredentials("user", "password");
 		CredentialItem.Username u = new CredentialItem.Username();
 		CredentialItem.Password p = new CredentialItem.Password();
-		assertTrue(((GitVCS) vcs).getCredentials().get(null, u, p));
+		assertTrue(git.getCredentials().get(null, u, p));
 		assertEquals(u.getValue(), "user");
 		assertEquals(new String(p.getValue()), "password");
 	}
@@ -183,10 +203,8 @@ public class GitVCSTest extends VCSAbstractTest {
 			testExceptionThrowing(eCommon, m, params);
 		}
 	}
-
-	private void testExceptionThrowing(Exception testException, Method m, Object[] params) throws Exception {
-		Mockito.reset((GitVCS) vcs);
-		Mockito.doThrow(testException).when((GitVCS) vcs).getLocalGit(mockedLWC);
+	
+	private void testExceptionThrowingNoMock(Exception testException, Method m, Object[] params) throws Exception {
 		try {
 			m.invoke(vcs, params);
 			if (wasGetLocalGitInvoked(vcs)) {
@@ -194,7 +212,8 @@ public class GitVCSTest extends VCSAbstractTest {
 			}
 		} catch (InvocationTargetException e) {
 			if (wasGetLocalGitInvoked(vcs)) {
-				assertTrue(e.getCause() instanceof RuntimeException);
+				// InvocationTargetException <- EVCSException <- GitAPIException 
+				assertTrue(e.getCause().getCause().getClass().isAssignableFrom(testException.getClass()));
 				assertTrue(e.getCause().getMessage().contains(testException.getMessage()));
 			}
 		} catch (Exception e) {
@@ -202,11 +221,19 @@ public class GitVCSTest extends VCSAbstractTest {
 				fail();
 			}
 		}
+		
+	}
+
+	private void testExceptionThrowing(Exception testException, Method m, Object[] params) throws Exception {
+		Mockito.reset(git);
+		Mockito.doThrow(testException).when(git).getLocalGit(mockedLWC);
+		testExceptionThrowingNoMock(testException, m, params);
+		
 	}
 
 	private Boolean wasGetLocalGitInvoked(IVCS vcs) throws Exception {
 		try {
-			Mockito.verify((GitVCS) vcs).getLocalGit(mockedLWC);
+			Mockito.verify(git).getLocalGit(mockedLWC);
 			return true;
 		} catch (WantedButNotInvoked e1) {
 			return false;
@@ -217,7 +244,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	public void testDefaultChangeTypeToVCSType() {
 		for (DiffEntry.ChangeType ct : DiffEntry.ChangeType.values()) {
 			if (ct != DiffEntry.ChangeType.ADD && ct != DiffEntry.ChangeType.DELETE && ct != DiffEntry.ChangeType.MODIFY) {
-				assertEquals(((GitVCS) vcs).gitChangeTypeToVCSChangeType(ct), VCSChangeType.UNKNOWN);
+				assertEquals(git.gitChangeTypeToVCSChangeType(ct), VCSChangeType.UNKNOWN);
 			}
 		}
 	}
@@ -239,6 +266,65 @@ public class GitVCSTest extends VCSAbstractTest {
 	public void testGitVCSUtilsCreation() {
 		assertNotNull(new GitVCSUtils());
 	}
-
+	
+	@Test
+	public void testGetLastTagEmptyTagRefsList() throws Exception {
+		Mockito.doReturn(new ArrayList<Ref>()).when(git).getTagRefs();
+		assertNull(vcs.getLastTag());
+	}
+	
+	@Test
+	public void testGetLastTagUnannotatedTag() throws Exception {
+		createUnannotatedTag(null, TAG_NAME_1);
+		VCSTag tag = vcs.getLastTag();
+		assertNull(tag.getAuthor());
+		assertNull(tag.getTagMessage());
+		assertEquals(tag.getTagName(), TAG_NAME_1);
+		assertEquals(tag.getRelatedCommit(), vcs.getHeadCommit(null));
+	}
+	
+	public void createUnannotatedTag(String branchName, String tagName) throws Exception {
+		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy();
+			 Git localGit = git.getLocalGit(wc);
+			 Repository gitRepo = localGit.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			
+			git.checkout(localGit, gitRepo, branchName);
+			
+			Ref ref = localGit
+					.tag()
+					.setAnnotated(false)
+					.setName(tagName)
+					.setObjectId(null)
+					.call();
+			
+			localGit
+					.push()
+					.setPushAll()
+					.setRefSpecs(new RefSpec(ref.getName()))
+					.setRemote("origin")
+					.setCredentialsProvider(git.getCredentials())
+					.call();
+		}
+	}
+	
+	@Test
+	public void testGetLastTagExceptions() throws Exception {
+		Ref dummyRef = Mockito.mock(Ref.class);
+		List<Ref> refList = new ArrayList<>();
+		refList.add(dummyRef);
+		Mockito.doReturn(refList).when(git).getTagRefs();
+		@SuppressWarnings("serial")
+		GitAPIException eApi = new GitAPIException("test git exception") {};
+		Exception eCommon = new Exception("test common exception");
+		//Mockito.reset(git);
+		Mockito.doThrow(eApi).when(git).getLocalGit(mockedLWC);
+		testExceptionThrowingNoMock(eApi, vcs.getClass().getDeclaredMethod("getLastTag"), new Object[0]);
+		
+		Mockito.reset(git);
+		Mockito.doReturn(refList).when(git).getTagRefs();
+		Mockito.doThrow(eCommon).when(git).getLocalGit(mockedLWC);
+		testExceptionThrowingNoMock(eCommon, vcs.getClass().getDeclaredMethod("getLastTag"), new Object[0]);
+	}
 }
 
