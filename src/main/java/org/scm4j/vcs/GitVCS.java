@@ -781,7 +781,7 @@ public class GitVCS implements IVCS {
             Ref ref = tagRefs.get(tagRefs.size() - 1);
             RevCommit revCommit = rw.parseCommit(ref.getObjectId());
             VCSCommit relatedCommit = getVCSCommit(revCommit);
-            if (ref instanceof Unpeeled) {
+            if (git.getRepository().peel(ref).getPeeledObjectId() == null) {
             	return new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
             }
         	RevTag revTag = rw.parseTag(ref.getObjectId());
