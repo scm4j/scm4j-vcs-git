@@ -27,6 +27,7 @@ import java.lang.reflect.Method;
 import java.net.*;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
@@ -259,6 +260,21 @@ public class GitVCSTest extends VCSAbstractTest {
 	public void testGetLastTagEmptyTagRefsList() throws Exception {
 		Mockito.doReturn(new ArrayList<Ref>()).when(git).getTagRefs();
 		assertNull(vcs.getLastTag());
+	}
+
+	@Test
+	public void testGetLastTagSortingFailed() throws Exception {
+		vcs.createTag(null, TAG_NAME_1, TAG_MESSAGE_1);
+		Ref ref1 = Mockito.mock(Ref.class);
+		Ref ref2 = Mockito.mock(Ref.class);
+		List<Ref> refs = Arrays.asList(ref1, ref2);
+		Mockito.doReturn(refs).when(git).getTagRefs();
+		try {
+			vcs.getLastTag();
+			fail();
+		} catch (RuntimeException e) {
+			assertTrue(e.getCause().getCause() instanceof NullPointerException);
+		}
 	}
 	
 	@Test

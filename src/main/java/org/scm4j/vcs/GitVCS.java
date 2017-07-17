@@ -326,15 +326,8 @@ public class GitVCS implements IVCS {
 				.pull()
 				.setCredentialsProvider(credentials)
 				.call();
-		CheckoutCommand cmd = git
-				.checkout();
-		Ref ref = gitRepo.exactRef("refs/heads/" + bn);
-		if (ref == null) {
-			cmd = cmd
-					.setCreateBranch(true)
-					.setStartPoint("origin/" + bn);
-		}
-		cmd
+		git
+				.checkout()
 				.setName(bn)
 				.call();
 	}
@@ -688,18 +681,22 @@ public class GitVCS implements IVCS {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-       
 	}
 	
 	List<Ref> getTagRefs() throws Exception {
-		return new ArrayList<>(Git
-				.lsRemoteRepository()
-				.setTags(true)
-				.setHeads(false)
-				.setRemote(repo.getRepoUrl())
-				.setCredentialsProvider(credentials)
-				.call());
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository()) {
+
+			checkout(git, gitRepo, MASTER_BRANCH_NAME);
+
+			List<Ref> refs = git
+					.tagList()
+					.call();
+
+			return refs;
 		}
+	}
 
 	@Override
 	public VCSTag getLastTag() {
@@ -719,11 +716,12 @@ public class GitVCS implements IVCS {
             
 			Collections.sort(tagRefs, new Comparator<Ref>() {
 				public int compare(Ref o1, Ref o2) {
-					try {
+					try (Repository gitRepo = git.getRepository();
+						 RevWalk rw = new RevWalk(gitRepo)) { // for exception rethrow test only
 						Date d1 = rw.parseTag(o1.getObjectId()).getTaggerIdent().getWhen();
 						Date d2 = rw.parseTag(o2.getObjectId()).getTaggerIdent().getWhen();
 						return d1.compareTo(d2);
-					} catch (IOException e) {
+					} catch (Exception e) {
 						throw new RuntimeException(e);
 					}
 				}
@@ -757,8 +755,8 @@ public class GitVCS implements IVCS {
 					.tagDelete()
 					.setTags(tagName)
 					.call();
-			
-			push(git, null);
+
+			push(git, new RefSpec(":refs/tags/" + tagName));
 			
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
