@@ -1,35 +1,10 @@
 package org.scm4j.vcs;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.Authenticator;
-import java.net.InetSocketAddress;
-import java.net.PasswordAuthentication;
-import java.net.Proxy;
-import java.net.Proxy.Type;
-import java.net.ProxySelector;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.eclipse.jgit.api.CheckoutCommand;
+import org.eclipse.jgit.api.*;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
-import org.eclipse.jgit.api.LogCommand;
-import org.eclipse.jgit.api.MergeResult;
-import org.eclipse.jgit.api.PushCommand;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -37,29 +12,17 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef.Unpeeled;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
-import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.scm4j.vcs.api.IVCS;
-import org.scm4j.vcs.api.VCSChangeType;
-import org.scm4j.vcs.api.VCSCommit;
-import org.scm4j.vcs.api.VCSDiffEntry;
-import org.scm4j.vcs.api.VCSMergeResult;
-import org.scm4j.vcs.api.VCSTag;
-import org.scm4j.vcs.api.WalkDirection;
+import org.scm4j.vcs.api.*;
 import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
 import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
@@ -67,6 +30,15 @@ import org.scm4j.vcs.api.exceptions.EVCSTagExists;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.*;
+import java.net.Proxy.Type;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class GitVCS implements IVCS {
 
@@ -159,21 +131,18 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-			try {
 
-				checkout(git, gitRepo, MASTER_BRANCH_NAME);
+			checkout(git, gitRepo, MASTER_BRANCH_NAME);
 
 			git
 					.branchDelete()
 					.setBranchNames(branchName)
-						.setForce(true) // avoid "not merged" exception
+					.setForce(true) // avoid "not merged" exception
 					.call();
 
 			RefSpec refSpec = new RefSpec( ":refs/heads/" + branchName);
-				push(git, refSpec);
-			} finally {
-			git.getRepository().close();
-			}
+			
+			push(git, refSpec);
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -181,14 +150,14 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private Iterable<PushResult> push(Git git, RefSpec refSpec) throws GitAPIException {
+	private void push(Git git, RefSpec refSpec) throws GitAPIException {
 		PushCommand cmd =  git
 				.push()
 				.setPushAll();
 		if (refSpec != null) {
 			cmd.setRefSpecs(refSpec);
 		}
-		return cmd
+		cmd
 				.setRemote("origin")
 				.setCredentialsProvider(credentials)
 				.call();
@@ -351,7 +320,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private void checkout(Git git, Repository gitRepo, String branchName) throws Exception {
+	void checkout(Git git, Repository gitRepo, String branchName) throws Exception {
 		String bn = getRealBranchName(branchName);
 		git
 				.pull()
@@ -703,17 +672,6 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 			
-//			git
-//					.checkout()
-//					.setCreateBranch(gitRepo.exactRef("refs/heads/master") == null)
-//					.setName("master")
-//					.call();
-//			
-//			git
-//					.pull()
-//					.setCredentialsProvider(credentials)
-//					.call();
-			
 			List<Ref> tagRefs = getTagRefs();
 	        List<VCSTag> res = new ArrayList<>();
 	        RevTag revTag;
@@ -733,7 +691,7 @@ public class GitVCS implements IVCS {
        
 	}
 	
-	private List<Ref> getTagRefs() throws Exception {
+	List<Ref> getTagRefs() throws Exception {
 		return new ArrayList<>(Git
 				.lsRemoteRepository()
 				.setTags(true)
@@ -741,13 +699,6 @@ public class GitVCS implements IVCS {
 				.setRemote(repo.getRepoUrl())
 				.setCredentialsProvider(credentials)
 				.call());
-		//return new ArrayList<>(Git
-				//.lsRemoteRepository()
-				//.setTags(true)
-				//.setHeads(false)
-				//.setRemote(repo.getRepoUrl())
-				//.setCredentialsProvider(credentials)
-				//.call());
 		}
 
 	@Override
