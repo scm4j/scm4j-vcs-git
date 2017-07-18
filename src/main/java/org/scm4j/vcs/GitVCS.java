@@ -260,12 +260,12 @@ public class GitVCS implements IVCS {
 
 			checkout(git, gitRepo, branchName);
 
-				return new File(wc.getFolder(), fileRelativePath);
-			} catch (GitAPIException e) {
-				throw new EVCSException(e);
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
+			return new File(wc.getFolder(), fileRelativePath);
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Override
@@ -328,6 +328,9 @@ public class GitVCS implements IVCS {
 				.call();
 		git
 				.checkout()
+				.setStartPoint("origin/" + bn)
+				.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
+				.setUpstreamMode(SetupUpstreamMode.TRACK)
 				.setName(bn)
 				.call();
 	}
