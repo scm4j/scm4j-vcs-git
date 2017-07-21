@@ -64,9 +64,9 @@ public class GitVCS implements IVCS {
 		return branchName == null ? MASTER_BRANCH_NAME : branchName;
 	}
 	
-	public Git getLocalGit(IVCSLockedWorkingCopy wc) throws Exception {
+	protected Git getLocalGit(String folder) throws Exception {
 		Repository gitRepo = new FileRepositoryBuilder()
-				.setGitDir(new File(wc.getFolder(), ".git"))
+				.setGitDir(new File(folder, ".git"))
 				.build();
 		Boolean repoInited = gitRepo
 				.getObjectDatabase()
@@ -74,7 +74,7 @@ public class GitVCS implements IVCS {
 		if (!repoInited) {
 			Git
 					.cloneRepository()
-					.setDirectory(wc.getFolder())
+					.setDirectory(new File(folder))
 					.setURI(repo.getRepoUrl())
 					.setCredentialsProvider(credentials)
 					.setNoCheckout(true)
@@ -83,6 +83,10 @@ public class GitVCS implements IVCS {
 					.close();
 		}
 		return new Git(gitRepo);
+	}
+	
+	protected Git getLocalGit(IVCSLockedWorkingCopy wc) throws Exception {
+		return getLocalGit(wc.getFolder().getPath());
 	}
 	
 	public VCSChangeType gitChangeTypeToVCSChangeType(ChangeType changeType) {
@@ -765,6 +769,20 @@ public class GitVCS implements IVCS {
 			throw new EVCSException(e);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
-}
+		}
+	}
+
+	@Override
+	public void checkout(String branchName, String targetPath)  {
+		try (Git git = getLocalGit(targetPath);
+			 Repository gitRepo = git.getRepository()) {
+			
+			checkout(git, gitRepo, branchName);
+			
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 }
