@@ -398,7 +398,7 @@ public class GitVCS implements IVCS {
 	}
 
 	@Override
-	public Set<String> getBranches() {
+	public Set<String> getBranches(String path) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
