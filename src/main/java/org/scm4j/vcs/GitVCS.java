@@ -12,6 +12,7 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
@@ -259,8 +260,8 @@ public class GitVCS implements IVCS {
 	
 	private File getFileFromRepo(String branchName, String fileRelativePath) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
-				 Git git = getLocalGit(wc);
-				 Repository gitRepo = git.getRepository()) {
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository()) {
 
 			checkout(git, gitRepo, branchName);
 
@@ -678,10 +679,16 @@ public class GitVCS implements IVCS {
 	        RevCommit revCommit;
 	        for (Ref ref : tagRefs) {
 	        	ObjectId relatedCommitObjectId = ref.getPeeledObjectId() == null ? ref.getObjectId() : ref.getPeeledObjectId();
-	        	revTag = rw.parseTag(ref.getObjectId());
 	        	revCommit = rw.parseCommit(relatedCommitObjectId);
 	        	VCSCommit relatedCommit = getVCSCommit(revCommit);
-	        	VCSTag tag = new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
+	        	VCSTag tag;
+	        	try {
+	        		revTag = rw.parseTag(ref.getObjectId());
+	        		tag = new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
+	        	} catch (IncorrectObjectTypeException e) {
+	        		// tag is unannonated
+	        		tag = new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
+	        	} 
 	        	res.add(tag);
 	        }
 	        return res;

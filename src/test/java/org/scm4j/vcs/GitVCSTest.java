@@ -196,17 +196,17 @@ public class GitVCSTest extends VCSAbstractTest {
 	private void testExceptionThrowingNoMock(Exception testException, Method m, Object[] params) throws Exception {
 		try {
 			m.invoke(vcs, params);
-			if (wasGetLocalGitInvoked(vcs)) {
+			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked(vcs)) {
 				fail();
 			}
 		} catch (InvocationTargetException e) {
-			if (wasGetLocalGitInvoked(vcs)) {
+			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked(vcs)) {
 				// InvocationTargetException <- EVCSException <- GitAPIException 
 				assertTrue(e.getCause().getCause().getClass().isAssignableFrom(testException.getClass()));
 				assertTrue(e.getCause().getMessage().contains(testException.getMessage()));
 			}
 		} catch (Exception e) {
-			if (wasGetLocalGitInvoked(vcs)) {
+			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked(vcs)) {
 				fail();
 			}
 		}
@@ -287,6 +287,18 @@ public class GitVCSTest extends VCSAbstractTest {
 		assertEquals(tag.getRelatedCommit(), vcs.getHeadCommit(null));
 	}
 	
+	@Test
+	public void testGetTagsUnannotated() throws Exception {
+		createUnannotatedTag(null, TAG_NAME_1);
+		List<VCSTag> tags = vcs.getTags();
+		assertTrue(tags.size() == 1);
+		VCSTag tag = tags.get(0);
+		assertNull(tag.getAuthor());
+		assertNull(tag.getTagMessage());
+		assertEquals(tag.getTagName(), TAG_NAME_1);
+		assertEquals(tag.getRelatedCommit(), vcs.getHeadCommit(null));
+	}
+	
 	public void createUnannotatedTag(String branchName, String tagName) throws Exception {
 		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy();
 			 Git localGit = git.getLocalGit(wc);
@@ -329,6 +341,19 @@ public class GitVCSTest extends VCSAbstractTest {
 		Mockito.doReturn(refList).when(git).getTagRefs();
 		Mockito.doThrow(eCommon).when(git).getLocalGit(mockedLWC);
 		testExceptionThrowingNoMock(eCommon, vcs.getClass().getDeclaredMethod("getLastTag"), new Object[0]);
+	}
+	
+	@Test
+	public void testCheckoutExceptions() throws Exception {
+		Exception eCommon = new Exception("test common exception");
+		Mockito.doThrow(eCommon).when(git).getLocalGit((String) null);
+		try {
+			git.checkout(null, null);
+			fail();
+		} catch (RuntimeException e) {
+			assertTrue(e.getCause().getClass().isAssignableFrom(eCommon.getClass()));
+			assertTrue(e.getCause().getMessage().contains(eCommon.getMessage()));
+		}
 	}
 }
 
