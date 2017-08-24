@@ -4,8 +4,10 @@ import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.CredentialItem;
 import org.eclipse.jgit.transport.RefSpec;
@@ -15,8 +17,10 @@ import org.mockito.Mockito;
 import org.mockito.exceptions.verification.WantedButNotInvoked;
 import org.scm4j.vcs.api.IVCS;
 import org.scm4j.vcs.api.VCSChangeType;
+import org.scm4j.vcs.api.VCSCommit;
 import org.scm4j.vcs.api.VCSTag;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
+import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 
@@ -264,7 +268,7 @@ public class GitVCSTest extends VCSAbstractTest {
 
 	@Test
 	public void testGetLastTagSortingFailed() throws Exception {
-		vcs.createTag(null, TAG_NAME_1, TAG_MESSAGE_1);
+		vcs.createTag(null, TAG_NAME_1, TAG_MESSAGE_1, null);
 		Ref ref1 = Mockito.mock(Ref.class);
 		Ref ref2 = Mockito.mock(Ref.class);
 		List<Ref> refs = Arrays.asList(ref1, ref2);
@@ -279,7 +283,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	@Test
 	public void testGetLastTagUnannotatedTag() throws Exception {
-		createUnannotatedTag(null, TAG_NAME_1);
+		createUnannotatedTag(null, TAG_NAME_1, null);
 		VCSTag tag = vcs.getLastTag();
 		assertNull(tag.getAuthor());
 		assertNull(tag.getTagMessage());
@@ -289,7 +293,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	@Test
 	public void testGetTagsUnannotated() throws Exception {
-		createUnannotatedTag(null, TAG_NAME_1);
+		createUnannotatedTag(null, TAG_NAME_1, null);
 		List<VCSTag> tags = vcs.getTags();
 		assertTrue(tags.size() == 1);
 		VCSTag tag = tags.get(0);
@@ -299,19 +303,21 @@ public class GitVCSTest extends VCSAbstractTest {
 		assertEquals(tag.getRelatedCommit(), vcs.getHeadCommit(null));
 	}
 	
-	public void createUnannotatedTag(String branchName, String tagName) throws Exception {
+	public void createUnannotatedTag(String branchName, String tagName, String revisionToTag) throws Exception {
 		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy();
 			 Git localGit = git.getLocalGit(wc);
 			 Repository gitRepo = localGit.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 			
-			git.checkout(localGit, gitRepo, branchName);
+			git.checkout(localGit, gitRepo, branchName, null);
+			
+			RevCommit commitToTag = revisionToTag == null ? null : rw.parseCommit(ObjectId.fromString(revisionToTag));
 			
 			Ref ref = localGit
 					.tag()
 					.setAnnotated(false)
 					.setName(tagName)
-					.setObjectId(null)
+					.setObjectId(commitToTag)
 					.call();
 			
 			localGit
@@ -345,15 +351,39 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	@Test
 	public void testCheckoutExceptions() throws Exception {
+		@SuppressWarnings("serial")
+		GitAPIException eApi = new GitAPIException("test git exception") {};
 		Exception eCommon = new Exception("test common exception");
 		Mockito.doThrow(eCommon).when(git).getLocalGit((String) null);
 		try {
-			git.checkout(null, null);
+			git.checkout(null, null, null);
 			fail();
 		} catch (RuntimeException e) {
 			assertTrue(e.getCause().getClass().isAssignableFrom(eCommon.getClass()));
 			assertTrue(e.getCause().getMessage().contains(eCommon.getMessage()));
 		}
+		
+		Mockito.doThrow(eApi).when(git).getLocalGit((String) null);
+		try {
+			git.checkout(null, null, null);
+			fail();
+		} catch (EVCSException e) {
+			assertTrue(e.getCause().getClass().isAssignableFrom(eApi.getClass()));
+			assertTrue(e.getCause().getMessage().contains(eApi.getMessage()));
+		}
+	}
+	
+	@Test
+	public void testIsRevisionTaggedUnannotated() throws Exception {
+		VCSCommit c1 = vcs.setFileContent(null, FILE1_NAME, LINE_1, FILE1_ADDED_COMMIT_MESSAGE);
+		VCSCommit c2 = vcs.setFileContent(null, FILE1_NAME, LINE_2, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_2);
+		VCSCommit c3 = vcs.setFileContent(null, FILE1_NAME, LINE_3, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_3);
+		
+		createUnannotatedTag(null, TAG_NAME_1, c2.getRevision());
+		
+		assertFalse(vcs.isRevisionTagged(c1.getRevision()));
+		assertTrue(vcs.isRevisionTagged(c2.getRevision()));
+		assertFalse(vcs.isRevisionTagged(c3.getRevision()));
 	}
 }
 
