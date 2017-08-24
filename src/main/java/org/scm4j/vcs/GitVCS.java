@@ -105,6 +105,7 @@ public class GitVCS implements IVCS {
 					.setURI(repo.getRepoUrl())
 					.setCredentialsProvider(credentials)
 					.setNoCheckout(true)
+					.setCloneAllBranches(true)
 					//.setBranch(Constants.R_HEADS + Constants.MASTER)
 					.call()
 					.close();
@@ -847,6 +848,39 @@ public class GitVCS implements IVCS {
 	        	}
 	        }
 	        return false;
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public VCSTag getTagByName(String tagName) {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			
+			List<Ref> tagRefs = getTagRefs();
+			RevCommit revCommit;
+			for (Ref ref : tagRefs) {
+				ObjectId relatedCommitObjectId = ref.getPeeledObjectId() == null ? ref.getObjectId() : ref.getPeeledObjectId();
+	        	revCommit = rw.parseCommit(relatedCommitObjectId);
+	        	VCSCommit relatedCommit = getVCSCommit(revCommit);
+	        	RevObject revObject = rw.parseAny(ref.getObjectId());
+	        	if (revObject instanceof RevTag) {
+	        		RevTag revTag = (RevTag) revObject;
+	        		if (revTag.getTagName().equals(tagName)) {
+	        			return new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
+	        		}
+	        	} else  {
+	        		if (ref.getName().equals(tagName)) {
+	        			return new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
+	        		}
+	        	}
+			}
+			return null;
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
