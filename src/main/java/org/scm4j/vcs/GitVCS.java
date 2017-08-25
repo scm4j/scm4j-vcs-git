@@ -362,6 +362,9 @@ public class GitVCS implements IVCS {
 					.setUpstreamMode(SetupUpstreamMode.TRACK)
 					.setName(bn)
 					.call();
+			git
+					.pull()
+					.call();
 		} else {
 			try (RevWalk walk = new RevWalk(gitRepo)) {
 				RevCommit commit = walk.parseCommit(RevCommit.fromString(revision));
@@ -436,7 +439,11 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-			checkout(git, gitRepo, MASTER_BRANCH_NAME, null);
+			
+			git
+					.pull()
+					.call();
+
 			List<Ref> refs = git
 					.branchList()
 					.setListMode(ListMode.REMOTE)
@@ -736,7 +743,8 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
 
-			checkout(git, gitRepo, MASTER_BRANCH_NAME, null);
+			//checkout(git, gitRepo, MASTER_BRANCH_NAME, null);
+			git.pull().call();
 			
 			List<Ref> refs = git
 					.tagList()
