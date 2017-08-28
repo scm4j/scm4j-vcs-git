@@ -184,10 +184,11 @@ public class GitVCS implements IVCS {
 
 	private void push(Git git, RefSpec refSpec) throws GitAPIException {
 		PushCommand cmd =  git
-				.push()
-				.setPushAll();
+				.push();
 		if (refSpec != null) {
 			cmd.setRefSpecs(refSpec);
+		} else {
+			cmd.setPushAll();
 		}
 		cmd
 				.setRemote("origin")
@@ -743,7 +744,6 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
 
-			//checkout(git, gitRepo, MASTER_BRANCH_NAME, null);
 			git.pull().call();
 			
 			List<Ref> refs = git
@@ -827,7 +827,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository()) {
 			
 			checkout(git, gitRepo, branchName, revision);
-			
+
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -838,9 +838,10 @@ public class GitVCS implements IVCS {
 	@Override
 	public Boolean isRevisionTagged(String revision) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
-				 Git git = getLocalGit(wc);
-				 Repository gitRepo = git.getRepository();
-				 RevWalk rw = new RevWalk(gitRepo)) {
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			
 			checkout(git, gitRepo, MASTER_BRANCH_NAME, null);
 			List<Ref> tagRefs = getTagRefs();
 	        for (Ref ref : tagRefs) {
@@ -869,6 +870,8 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
+			
+			git.pull().call();
 			
 			List<Ref> tagRefs = getTagRefs();
 			RevCommit revCommit;
