@@ -524,7 +524,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private VCSCommit getVCSCommit(RevCommit revCommit) {
+	protected VCSCommit getVCSCommit(RevCommit revCommit) {
 		return new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
 	}
 
@@ -886,7 +886,7 @@ public class GitVCS implements IVCS {
 	        			return new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
 	        		}
 	        	} else  {
-	        		if (ref.getName().equals(tagName)) {
+	        		if (ref.getName().replace("refs/tags/", "").equals(tagName)) {
 	        			return new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
 	        		}
 	        	}

@@ -200,17 +200,17 @@ public class GitVCSTest extends VCSAbstractTest {
 	private void testExceptionThrowingNoMock(Exception testException, Method m, Object[] params) throws Exception {
 		try {
 			m.invoke(vcs, params);
-			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked(vcs)) {
+			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked()) {
 				fail();
 			}
 		} catch (InvocationTargetException e) {
-			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked(vcs)) {
+			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked()) {
 				// InvocationTargetException <- EVCSException <- GitAPIException 
 				assertTrue(e.getCause().getCause().getClass().isAssignableFrom(testException.getClass()));
 				assertTrue(e.getCause().getMessage().contains(testException.getMessage()));
 			}
 		} catch (Exception e) {
-			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked(vcs)) {
+			if (!m.getName().equals("checkout") && wasGetLocalGitInvoked()) {
 				fail();
 			}
 		}
@@ -224,7 +224,7 @@ public class GitVCSTest extends VCSAbstractTest {
 		
 	}
 
-	private Boolean wasGetLocalGitInvoked(IVCS vcs) throws Exception {
+	private Boolean wasGetLocalGitInvoked() throws Exception {
 		try {
 			Mockito.verify(git).getLocalGit(mockedLWC);
 			return true;
@@ -303,7 +303,7 @@ public class GitVCSTest extends VCSAbstractTest {
 		assertEquals(tag.getRelatedCommit(), vcs.getHeadCommit(null));
 	}
 	
-	public void createUnannotatedTag(String branchName, String tagName, String revisionToTag) throws Exception {
+	public VCSTag createUnannotatedTag(String branchName, String tagName, String revisionToTag) throws Exception {
 		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy();
 			 Git localGit = git.getLocalGit(wc);
 			 Repository gitRepo = localGit.getRepository();
@@ -327,6 +327,8 @@ public class GitVCSTest extends VCSAbstractTest {
 					.setRemote("origin")
 					.setCredentialsProvider(git.getCredentials())
 					.call();
+			return new VCSTag(tagName, null, null, revisionToTag == null ? vcs.getHeadCommit(branchName)
+					: git.getVCSCommit(commitToTag));
 		}
 	}
 	
@@ -384,6 +386,19 @@ public class GitVCSTest extends VCSAbstractTest {
 		assertFalse(vcs.isRevisionTagged(c1.getRevision()));
 		assertTrue(vcs.isRevisionTagged(c2.getRevision()));
 		assertFalse(vcs.isRevisionTagged(c3.getRevision()));
+	}
+
+	@Test
+	public void testGetTagByNameUnannotated() throws Exception {
+		vcs.setFileContent(null, FILE1_NAME, LINE_1, FILE1_ADDED_COMMIT_MESSAGE);
+		VCSCommit c2 = vcs.setFileContent(null, FILE1_NAME, LINE_2, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_2);
+		VCSCommit c3 = vcs.setFileContent(null, FILE1_NAME, LINE_3, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_3);
+
+		VCSTag tag1 = createUnannotatedTag(null, TAG_NAME_1, c2.getRevision());
+		VCSTag tag2 = createUnannotatedTag(null, TAG_NAME_2, c3.getRevision());
+
+		assertEquals(tag1, vcs.getTagByName(TAG_NAME_1));
+		assertEquals(tag2, vcs.getTagByName(TAG_NAME_2));
 	}
 }
 
