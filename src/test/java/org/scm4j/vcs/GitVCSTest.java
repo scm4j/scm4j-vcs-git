@@ -19,6 +19,7 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
@@ -38,6 +39,7 @@ import org.mockito.Mockito;
 import org.mockito.exceptions.verification.WantedButNotInvoked;
 import org.scm4j.vcs.api.IVCS;
 import org.scm4j.vcs.api.VCSChangeType;
+import org.scm4j.vcs.api.VCSCommit;
 import org.scm4j.vcs.api.VCSTag;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 import org.scm4j.vcs.api.exceptions.EVCSException;
@@ -318,6 +320,24 @@ public class GitVCSTest extends VCSAbstractTest {
 			assertTrue(e.getCause().getClass().isAssignableFrom(eApi.getClass()));
 			assertTrue(e.getCause().getMessage().contains(eApi.getMessage()));
 		}
+	}
+
+	@Test
+	public void testGetTagsOnRevisionUnannotated() throws Exception {
+		VCSCommit c1 = vcs.setFileContent(null, FILE1_NAME, LINE_1, FILE1_ADDED_COMMIT_MESSAGE);
+		VCSCommit c2 = vcs.setFileContent(null, FILE1_NAME, LINE_2, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_2);
+		vcs.createBranch(null, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
+		VCSCommit c3 = vcs.setFileContent(NEW_BRANCH, FILE1_NAME, LINE_3, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_3);
+
+		VCSTag tag1 = createUnannotatedTag(null, TAG_NAME_1, c1.getRevision());
+		VCSTag tag2 = createUnannotatedTag(null, TAG_NAME_2, c1.getRevision());
+		VCSTag tag3 = createUnannotatedTag(NEW_BRANCH, TAG_NAME_3, c3.getRevision());
+
+		assertTrue(vcs.getTagsOnRevision(c1.getRevision()).containsAll(Arrays.asList(
+				tag1, tag2)));
+		assertTrue(vcs.getTagsOnRevision(c2.getRevision()).isEmpty());
+		assertTrue(vcs.getTagsOnRevision(c3.getRevision()).containsAll(Arrays.asList(
+				tag3)));
 	}
 }
 
