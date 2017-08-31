@@ -1,5 +1,26 @@
 package org.scm4j.vcs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.Authenticator;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -17,24 +38,11 @@ import org.mockito.Mockito;
 import org.mockito.exceptions.verification.WantedButNotInvoked;
 import org.scm4j.vcs.api.IVCS;
 import org.scm4j.vcs.api.VCSChangeType;
-import org.scm4j.vcs.api.VCSCommit;
 import org.scm4j.vcs.api.VCSTag;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.*;
-import java.nio.charset.IllegalCharsetNameException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.junit.Assert.*;
 
 public class GitVCSTest extends VCSAbstractTest {
 
@@ -243,52 +251,8 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 
 	@Test
-	public void testGetFileContentExceptions() {
-		vcs.setFileContent(null, FILE1_NAME, LINE_1, FILE1_ADDED_COMMIT_MESSAGE);
-		try {
-			vcs.getFileContent(null, FILE1_NAME, "wrong encoding");
-			fail();
-		} catch (RuntimeException e) {
-			assertTrue(e.getCause() instanceof IllegalCharsetNameException);
-		} catch (Exception e) {
-			fail();
-		}
-	}
-
-	@Test
 	public void testGitVCSUtilsCreation() {
 		assertNotNull(new GitVCSUtils());
-	}
-	
-	@Test
-	public void testGetLastTagEmptyTagRefsList() throws Exception {
-		Mockito.doReturn(new ArrayList<Ref>()).when(git).getTagRefs();
-		assertNull(vcs.getLastTag());
-	}
-
-	@Test
-	public void testGetLastTagSortingFailed() throws Exception {
-		vcs.createTag(null, TAG_NAME_1, TAG_MESSAGE_1, null);
-		Ref ref1 = Mockito.mock(Ref.class);
-		Ref ref2 = Mockito.mock(Ref.class);
-		List<Ref> refs = Arrays.asList(ref1, ref2);
-		Mockito.doReturn(refs).when(git).getTagRefs();
-		try {
-			vcs.getLastTag();
-			fail();
-		} catch (RuntimeException e) {
-			assertTrue(e.getCause().getCause() instanceof NullPointerException);
-		}
-	}
-	
-	@Test
-	public void testGetLastTagUnannotatedTag() throws Exception {
-		createUnannotatedTag(null, TAG_NAME_1, null);
-		VCSTag tag = vcs.getLastTag();
-		assertNull(tag.getAuthor());
-		assertNull(tag.getTagMessage());
-		assertEquals(tag.getTagName(), TAG_NAME_1);
-		assertEquals(tag.getRelatedCommit(), vcs.getHeadCommit(null));
 	}
 	
 	@Test
@@ -333,25 +297,6 @@ public class GitVCSTest extends VCSAbstractTest {
 	}
 	
 	@Test
-	public void testGetLastTagExceptions() throws Exception {
-		Ref dummyRef = Mockito.mock(Ref.class);
-		List<Ref> refList = new ArrayList<>();
-		refList.add(dummyRef);
-		Mockito.doReturn(refList).when(git).getTagRefs();
-		@SuppressWarnings("serial")
-		GitAPIException eApi = new GitAPIException("test git exception") {};
-		Exception eCommon = new Exception("test common exception");
-		//Mockito.reset(git);
-		Mockito.doThrow(eApi).when(git).getLocalGit(mockedLWC);
-		testExceptionThrowingNoMock(eApi, vcs.getClass().getDeclaredMethod("getLastTag"), new Object[0]);
-		
-		Mockito.reset(git);
-		Mockito.doReturn(refList).when(git).getTagRefs();
-		Mockito.doThrow(eCommon).when(git).getLocalGit(mockedLWC);
-		testExceptionThrowingNoMock(eCommon, vcs.getClass().getDeclaredMethod("getLastTag"), new Object[0]);
-	}
-	
-	@Test
 	public void testCheckoutExceptions() throws Exception {
 		@SuppressWarnings("serial")
 		GitAPIException eApi = new GitAPIException("test git exception") {};
@@ -373,32 +318,6 @@ public class GitVCSTest extends VCSAbstractTest {
 			assertTrue(e.getCause().getClass().isAssignableFrom(eApi.getClass()));
 			assertTrue(e.getCause().getMessage().contains(eApi.getMessage()));
 		}
-	}
-	
-	@Test
-	public void testIsRevisionTaggedUnannotated() throws Exception {
-		VCSCommit c1 = vcs.setFileContent(null, FILE1_NAME, LINE_1, FILE1_ADDED_COMMIT_MESSAGE);
-		VCSCommit c2 = vcs.setFileContent(null, FILE1_NAME, LINE_2, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_2);
-		VCSCommit c3 = vcs.setFileContent(null, FILE1_NAME, LINE_3, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_3);
-		
-		createUnannotatedTag(null, TAG_NAME_1, c2.getRevision());
-		
-		assertFalse(vcs.isRevisionTagged(c1.getRevision()));
-		assertTrue(vcs.isRevisionTagged(c2.getRevision()));
-		assertFalse(vcs.isRevisionTagged(c3.getRevision()));
-	}
-
-	@Test
-	public void testGetTagByNameUnannotated() throws Exception {
-		vcs.setFileContent(null, FILE1_NAME, LINE_1, FILE1_ADDED_COMMIT_MESSAGE);
-		VCSCommit c2 = vcs.setFileContent(null, FILE1_NAME, LINE_2, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_2);
-		VCSCommit c3 = vcs.setFileContent(null, FILE1_NAME, LINE_3, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_3);
-
-		VCSTag tag1 = createUnannotatedTag(null, TAG_NAME_1, c2.getRevision());
-		VCSTag tag2 = createUnannotatedTag(null, TAG_NAME_2, c3.getRevision());
-
-		assertEquals(tag1, vcs.getTagByName(TAG_NAME_1));
-		assertEquals(tag2, vcs.getTagByName(TAG_NAME_2));
 	}
 }
 
