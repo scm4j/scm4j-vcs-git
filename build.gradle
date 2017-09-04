@@ -12,7 +12,7 @@ sourceCompatibility = JavaVersion.VERSION_1_7
 targetCompatibility = JavaVersion.VERSION_1_7
 
 group = 'org.scm4j'
-version = '4.0-SNAPSHOT'
+version = file('version').text.trim()
 
 configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
@@ -34,12 +34,17 @@ repositories {
 }
 
 dependencies {                                                            
-	compile 'com.github.scm4j:scm4j-vcs-api:master-SNAPSHOT'
+	// load managed dependencies
+	def s = '[ \t]*', w = '[^:#@]+?'
+	(file('mdeps').text =~ /(?m)^$s($w):($w):($w)?(:$w)?(@$w)?$s(?:#$s($w)?$s)?$/).each {
+			match, group, name, version, classifier, ext, configuration ->
+		add(configuration ?: name.contains('test') ? 'testCompile' : 'compile', "$group:$name:${version?:''}${classifier?:''}${ext?:''}")
+	}
 	compile 'org.eclipse.jgit:org.eclipse.jgit:4.3.0.201604071810-r'
 	
 	testCompile 'org.mockito:mockito-core:2.0.62-beta'
 	testCompile 'junit:junit:4.12'
-	testCompile 'com.github.scm4j:scm4j-vcs-test:master-SNAPSHOT'
+//	testCompile 'com.github.scm4j:scm4j-vcs-test:master-SNAPSHOT'
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
