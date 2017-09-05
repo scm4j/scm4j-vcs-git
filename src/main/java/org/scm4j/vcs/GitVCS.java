@@ -595,43 +595,42 @@ public class GitVCS implements IVCS {
 			int limit) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
-			 Repository gitRepo = git.getRepository()) {
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
 
 			checkout(git, gitRepo, branchName, null);
 
 			String bn = getRealBranchName(branchName);
 
 			List<VCSCommit> res = new ArrayList<>();
-			try (RevWalk rw = new RevWalk(gitRepo)) {
-				RevCommit startCommit;
-				RevCommit endCommit;
-				if (direction == WalkDirection.ASC) {
-					Ref ref = gitRepo.exactRef("refs/heads/" + bn);
-					ObjectId headCommitId = ref.getObjectId();
-					startCommit = rw.parseCommit( headCommitId );
-					ObjectId sinceCommit = startFromCommitId == null ?
-							getInitialCommit(gitRepo, bn).getId() :
-							ObjectId.fromString(startFromCommitId);
-					endCommit = rw.parseCommit(sinceCommit);
-				} else {
-					ObjectId sinceCommit = startFromCommitId == null ?
-							gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
-							ObjectId.fromString(startFromCommitId);
-					startCommit = rw.parseCommit( sinceCommit );
-					endCommit = getInitialCommit(gitRepo, bn);
-				}
+			RevCommit startCommit;
+			RevCommit endCommit;
+			if (direction == WalkDirection.ASC) {
+				Ref ref = gitRepo.exactRef("refs/heads/" + bn);
+				ObjectId headCommitId = ref.getObjectId();
+				startCommit = rw.parseCommit( headCommitId );
+				ObjectId sinceCommit = startFromCommitId == null ?
+						getInitialCommit(gitRepo, bn).getId() :
+						ObjectId.fromString(startFromCommitId);
+				endCommit = rw.parseCommit(sinceCommit);
+			} else {
+				ObjectId sinceCommit = startFromCommitId == null ?
+						gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
+						ObjectId.fromString(startFromCommitId);
+				startCommit = rw.parseCommit( sinceCommit );
+				endCommit = getInitialCommit(gitRepo, bn);
+			}
 
-				rw.markStart(startCommit);
+			rw.markStart(startCommit);
 
-				RevCommit commit = rw.next();
-				while (commit != null) {
-					VCSCommit vcsCommit = getVCSCommit(commit);
-					res.add(vcsCommit);
-					if (commit.getName().equals(endCommit.getName())) {
-						break;
-					}
-					commit = rw.next();
+			RevCommit commit = rw.next();
+			while (commit != null) {
+				VCSCommit vcsCommit = getVCSCommit(commit);
+				res.add(vcsCommit);
+				if (commit.getName().equals(endCommit.getName())) {
+					break;
 				}
+				commit = rw.next();
 			}
 
 			if (direction == WalkDirection.ASC) {
