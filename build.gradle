@@ -35,12 +35,11 @@ repositories {
 
 dependencies {                                                            
 	// load managed dependencies
-//	def s = '[ \t]*', w = '[^:#@]+?'
-//	(file('mdeps').text =~ /(?m)^$s($w):($w):($w)?(:$w)?(@$w)?$s(?:#$s($w)?$s)?$/).each {
-//			match, group, name, version, classifier, ext, configuration ->
-//		add(configuration ?: name.contains('test') ? 'testCompile' : 'compile', "$group:$name:${version?:''}${classifier?:''}${ext?:''}")
-//	}
-	compile 'com.github.scm4j:scm4j-vcs-api:master-SNAPSHOT'
+	def s = '[ \t]*', w = '[^:#@]+?'
+	(file('mdeps').text =~ /(?m)^$s($w):($w):($w)?(:$w)?(@$w)?$s(?:#$s($w)?$s)?$/).each {
+			match, group, name, version, classifier, ext, configuration ->
+		add(configuration ?: name.contains('test') ? 'testCompile' : 'compile', "$group:$name:${version?:''}${classifier?:''}${ext?:''}")
+	}
 	compile 'org.eclipse.jgit:org.eclipse.jgit:4.3.0.201604071810-r'
 	
 	testCompile 'org.mockito:mockito-core:2.0.62-beta'
