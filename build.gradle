@@ -44,7 +44,6 @@ dependencies {
 	
 	testCompile 'org.mockito:mockito-core:2.0.62-beta'
 	testCompile 'junit:junit:4.12'
-//	testCompile 'com.github.scm4j:scm4j-vcs-test:master-SNAPSHOT'
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
