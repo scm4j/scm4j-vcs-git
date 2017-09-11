@@ -104,7 +104,6 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.setNoCheckout(true)
 					.setCloneAllBranches(true)
-					//.setBranch(Constants.R_HEADS + Constants.MASTER)
 					.call()
 					.close();
 		}
@@ -126,6 +125,36 @@ public class GitVCS implements IVCS {
 		default:
 			return VCSChangeType.UNKNOWN;
 		}
+	}
+	
+	public VCSTag createUnannotatedTag(String branchName, String tagName, String revisionToTag) {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			
+			git
+					.pull()
+					.call();
+			
+			RevCommit commitToTag = revisionToTag == null ? null : rw.parseCommit(ObjectId.fromString(revisionToTag));
+			
+			Ref ref = git
+					.tag()
+					.setAnnotated(false)
+					.setName(tagName)
+					.setObjectId(commitToTag)
+					.call();
+			
+			push(git, new RefSpec(ref.getName()));
+			
+			return new VCSTag(tagName, null, null, revisionToTag == null ? getHeadCommit(branchName)
+					: getVCSCommit(commitToTag));
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		} 
 	}
 
 	@Override

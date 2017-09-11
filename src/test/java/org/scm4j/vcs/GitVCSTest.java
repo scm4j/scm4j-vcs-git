@@ -23,16 +23,12 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.CredentialItem;
-import org.eclipse.jgit.transport.RefSpec;
 import org.junit.After;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -43,7 +39,6 @@ import org.scm4j.vcs.api.VCSCommit;
 import org.scm4j.vcs.api.VCSTag;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 import org.scm4j.vcs.api.exceptions.EVCSException;
-import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 
 public class GitVCSTest extends VCSAbstractTest {
@@ -194,7 +189,7 @@ public class GitVCSTest extends VCSAbstractTest {
 		@SuppressWarnings("serial")
 		GitAPIException eApi = new GitAPIException("test git exception") {};
 		Exception eCommon = new Exception("test common exception");
-		for (Method m : IVCS.class.getDeclaredMethods()) {
+		for (Method m : ArrayUtils.addAll(IVCS.class.getDeclaredMethods(), GitVCS.class.getMethod("createUnannotatedTag", String.class, String.class, String.class))) {
 			Object[] params = new Object[m.getParameterTypes().length];
 			Integer i = 0;
 			for (Class<?> clazz : m.getParameterTypes()) {
@@ -259,7 +254,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	@Test
 	public void testGetTagsUnannotated() throws Exception {
-		createUnannotatedTag(null, TAG_NAME_1, null);
+		git.createUnannotatedTag(null, TAG_NAME_1, null);
 		List<VCSTag> tags = vcs.getTags();
 		assertTrue(tags.size() == 1);
 		VCSTag tag = tags.get(0);
@@ -267,35 +262,6 @@ public class GitVCSTest extends VCSAbstractTest {
 		assertNull(tag.getTagMessage());
 		assertEquals(tag.getTagName(), TAG_NAME_1);
 		assertEquals(tag.getRelatedCommit(), vcs.getHeadCommit(null));
-	}
-	
-	public VCSTag createUnannotatedTag(String branchName, String tagName, String revisionToTag) throws Exception {
-		try (IVCSLockedWorkingCopy wc = localVCSRepo.getVCSLockedWorkingCopy();
-			 Git localGit = git.getLocalGit(wc);
-			 Repository gitRepo = localGit.getRepository();
-			 RevWalk rw = new RevWalk(gitRepo)) {
-			
-			git.checkout(localGit, gitRepo, branchName, null);
-			
-			RevCommit commitToTag = revisionToTag == null ? null : rw.parseCommit(ObjectId.fromString(revisionToTag));
-			
-			Ref ref = localGit
-					.tag()
-					.setAnnotated(false)
-					.setName(tagName)
-					.setObjectId(commitToTag)
-					.call();
-			
-			localGit
-					.push()
-					.setPushAll()
-					.setRefSpecs(new RefSpec(ref.getName()))
-					.setRemote("origin")
-					.setCredentialsProvider(git.getCredentials())
-					.call();
-			return new VCSTag(tagName, null, null, revisionToTag == null ? vcs.getHeadCommit(branchName)
-					: git.getVCSCommit(commitToTag));
-		}
 	}
 	
 	@Test
@@ -329,9 +295,9 @@ public class GitVCSTest extends VCSAbstractTest {
 		vcs.createBranch(null, NEW_BRANCH, CREATED_DST_BRANCH_COMMIT_MESSAGE);
 		VCSCommit c3 = vcs.setFileContent(NEW_BRANCH, FILE1_NAME, LINE_3, FILE1_CONTENT_CHANGED_COMMIT_MESSAGE + " " + LINE_3);
 
-		VCSTag tag1 = createUnannotatedTag(null, TAG_NAME_1, c1.getRevision());
-		VCSTag tag2 = createUnannotatedTag(null, TAG_NAME_2, c1.getRevision());
-		VCSTag tag3 = createUnannotatedTag(NEW_BRANCH, TAG_NAME_3, c3.getRevision());
+		VCSTag tag1 = git.createUnannotatedTag(null, TAG_NAME_1, c1.getRevision());
+		VCSTag tag2 = git.createUnannotatedTag(null, TAG_NAME_2, c1.getRevision());
+		VCSTag tag3 = git.createUnannotatedTag(NEW_BRANCH, TAG_NAME_3, c3.getRevision());
 
 		assertTrue(vcs.getTagsOnRevision(c1.getRevision()).containsAll(Arrays.asList(
 				tag1, tag2)));
