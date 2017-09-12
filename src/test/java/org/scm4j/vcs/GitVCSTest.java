@@ -39,7 +39,10 @@ import org.scm4j.vcs.api.VCSCommit;
 import org.scm4j.vcs.api.VCSTag;
 import org.scm4j.vcs.api.abstracttest.VCSAbstractTest;
 import org.scm4j.vcs.api.exceptions.EVCSException;
+import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
+import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
+import org.scm4j.vcs.api.workingcopy.VCSWorkspace;
 
 public class GitVCSTest extends VCSAbstractTest {
 
@@ -67,7 +70,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	@Override
 	protected String getTestRepoUrl() {
-		return ("file:///" + localVCSWorkspace.getHomeFolder() + "/").replace("\\", "/");
+		return localVCSWorkspace.getHomeFolder().toURI().toString();
 	}
 
 	@Override
@@ -254,7 +257,13 @@ public class GitVCSTest extends VCSAbstractTest {
 	
 	@Test
 	public void testGetTagsUnannotated() throws Exception {
-		git.createUnannotatedTag(null, TAG_NAME_1, null);
+		// create tag in different working copy
+		try (IVCSLockedWorkingCopy lwc = localVCSRepo.getVCSLockedWorkingCopyTemp()) {
+			IVCSWorkspace tempWS = new VCSWorkspace(lwc.getFolder().toString());
+			IVCSRepositoryWorkspace tempRWS = tempWS.getVCSRepositoryWorkspace(vcs.getRepoUrl());
+			GitVCS tempVCS = new GitVCS(tempRWS);
+			tempVCS.createUnannotatedTag(null, TAG_NAME_1, null);
+		}
 		List<VCSTag> tags = vcs.getTags();
 		assertTrue(tags.size() == 1);
 		VCSTag tag = tags.get(0);
