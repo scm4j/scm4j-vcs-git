@@ -47,6 +47,7 @@ dependencies {
 		add(configuration ?: name.contains('test') ? 'testCompile' : 'compile', "$group:$name:${version?:''}${classifier?:''}${ext?:''}")
 	}
 	compile 'org.eclipse.jgit:org.eclipse.jgit:4.3.0.201604071810-r'
+	compile 'org.apache.commons:commons-lang3:3.5'
 	
 	testCompile 'org.mockito:mockito-core:2.0.62-beta'
 	testCompile 'junit:junit:4.12'
