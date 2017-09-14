@@ -12,6 +12,7 @@ Features:
 - Branches list
 - File content getting and setting
 - File create and remove
+- Working with tags
 
 # Terms
 - Workspace Home
