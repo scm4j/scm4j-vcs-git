@@ -470,9 +470,9 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
 			
-//			git
-//					.pull()
-//					.call();
+			git
+					.pull()
+					.call();
 
 			List<Ref> refs = git
 					.branchList()
