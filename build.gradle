@@ -25,6 +25,12 @@ jacocoTestReport {
 	}
 }
 
+test {
+    testLogging {
+        events "failed"
+        exceptionFormat "full"
+    }
+}
 
 repositories {
 	mavenCentral()

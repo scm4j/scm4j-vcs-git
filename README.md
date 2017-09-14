@@ -12,6 +12,7 @@ Features:
 - Branches list
 - File content getting and setting
 - File create and remove
+- Working with tags
 
 # Terms
 - Workspace Home
@@ -52,6 +53,8 @@ Features:
 	```
 - Use methods of `IVCS` interface. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Use `vcs.setProxy()` and `vcs.setCredentials()` if necessary
+- Use `VCSTag createUnannotatedTag(String branchName, String tagName, String revisionToTag)` to create git unannontated tag with name `tagName` on `revisionToTag` commit of branch `branchName`. If `branchName` is null then master branch is used. If `revisionToTag` is null then head of branch `branchName` is used.
+	-  
 
 # Implementation details
 - [JGit](https://eclipse.org/jgit/) is used as framework to work with Git repositories

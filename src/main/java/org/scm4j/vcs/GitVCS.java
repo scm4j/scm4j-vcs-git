@@ -104,7 +104,6 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.setNoCheckout(true)
 					.setCloneAllBranches(true)
-					//.setBranch(Constants.R_HEADS + Constants.MASTER)
 					.call()
 					.close();
 		}
@@ -126,6 +125,36 @@ public class GitVCS implements IVCS {
 		default:
 			return VCSChangeType.UNKNOWN;
 		}
+	}
+	
+	public VCSTag createUnannotatedTag(String branchName, String tagName, String revisionToTag) {
+		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
+			 Git git = getLocalGit(wc);
+			 Repository gitRepo = git.getRepository();
+			 RevWalk rw = new RevWalk(gitRepo)) {
+			
+			git
+					.pull()
+					.call();
+			
+			RevCommit commitToTag = revisionToTag == null ? null : rw.parseCommit(ObjectId.fromString(revisionToTag));
+			
+			Ref ref = git
+					.tag()
+					.setAnnotated(false)
+					.setName(tagName)
+					.setObjectId(commitToTag)
+					.call();
+			
+			push(git, new RefSpec(ref.getName()));
+			
+			return new VCSTag(tagName, null, null, revisionToTag == null ? getHeadCommit(branchName)
+					: getVCSCommit(commitToTag));
+		} catch (GitAPIException e) {
+			throw new EVCSException(e);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		} 
 	}
 
 	@Override
@@ -700,7 +729,9 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 			
-			checkout(git, gitRepo, branchName, null);
+			git
+					.pull()
+					.call();
 			
 			RevCommit commitToTag = revisionToTag == null ? null : rw.parseCommit(ObjectId.fromString(revisionToTag));
 			
@@ -734,9 +765,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 			
-			git.pull().call();
-			
-			List<Ref> tagRefs = getTagRefs();
+			List<Ref> tagRefs = getTagRefs(git);
 	        List<VCSTag> res = new ArrayList<>();
 	        RevCommit revCommit;
 	        for (Ref ref : tagRefs) {
@@ -749,6 +778,7 @@ public class GitVCS implements IVCS {
 	        		RevTag revTag = (RevTag) revObject;
 	        		tag = new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
 	        	} else  {
+	        		// tag is unannotated
 	        		tag = new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
 	        	}
 	        	res.add(tag);
@@ -759,19 +789,17 @@ public class GitVCS implements IVCS {
 		}
 	}
 	
-	List<Ref> getTagRefs() throws Exception {
-		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
-			 Git git = getLocalGit(wc);
-			 Repository gitRepo = git.getRepository()) {
-
-			git.pull().call();
-			
-			List<Ref> refs = git
-					.tagList()
-					.call();
-
-			return refs;
-		}
+	private List<Ref> getTagRefs(Git git) throws Exception {
+		// need to remove tags from local repo which are removed in origin
+		git
+				.fetch()
+				.setRefSpecs(new RefSpec("+refs/tags/*:refs/tags/*"))
+				.setRemoveDeletedRefs(true)
+				.setCredentialsProvider(credentials)
+				.call();
+		return git
+				.tagList()
+				.call();
 	}
 
 	@Override
@@ -781,14 +809,15 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 			
-			checkout(git, gitRepo, MASTER_BRANCH_NAME, null);
-			
+			git.pull().call();
+
 			git
 					.tagDelete()
 					.setTags(tagName)
 					.call();
-
+		
 			push(git, new RefSpec(":refs/tags/" + tagName));
+			
 			
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
@@ -819,10 +848,8 @@ public class GitVCS implements IVCS {
 			 RevWalk rw = new RevWalk(gitRepo)) {
 			
 			List<VCSTag> res = new ArrayList<>();
-				
-			git.pull().call();
 			
-			List<Ref> tagRefs = getTagRefs();
+			List<Ref> tagRefs = getTagRefs(git);
 			RevCommit revCommit;
 			for (Ref ref : tagRefs) {
 				ObjectId relatedCommitObjectId = ref.getPeeledObjectId() == null ? ref.getObjectId() : ref.getPeeledObjectId();
