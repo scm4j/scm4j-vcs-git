@@ -287,7 +287,9 @@ public class GitVCS implements IVCS {
 	public String getFileContent(String branchName, String fileRelativePath, String revision) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
-			 Repository gitRepo = git.getRepository()) {
+			 Repository gitRepo = git.getRepository();
+			 RevWalk revWalk = new RevWalk(gitRepo);
+			 TreeWalk treeWalk = new TreeWalk(gitRepo);) {
 
 			git
 					.fetch()
@@ -296,8 +298,7 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.call();
 			git.pull().call(); //TODO: add test when we receive correct file version if we change it from another LWC
-			RevWalk revWalk = new RevWalk(gitRepo);
-			TreeWalk treeWalk = new TreeWalk(gitRepo);
+			
 			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName)  : revision);
 			RevCommit commit = revWalk.parseCommit(revisionCommitId);
 			RevTree tree = commit.getTree();
