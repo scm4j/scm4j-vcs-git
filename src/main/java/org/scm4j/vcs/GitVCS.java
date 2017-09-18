@@ -1,33 +1,9 @@
 package org.scm4j.vcs;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.Authenticator;
-import java.net.InetSocketAddress;
-import java.net.PasswordAuthentication;
-import java.net.Proxy;
-import java.net.Proxy.Type;
-import java.net.ProxySelector;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.eclipse.jgit.api.CheckoutCommand;
+import org.eclipse.jgit.api.*;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.ListBranchCommand.ListMode;
-import org.eclipse.jgit.api.LogCommand;
-import org.eclipse.jgit.api.MergeResult;
-import org.eclipse.jgit.api.PushCommand;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -35,28 +11,16 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevTag;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.revwalk.*;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.scm4j.vcs.api.IVCS;
-import org.scm4j.vcs.api.VCSChangeType;
-import org.scm4j.vcs.api.VCSCommit;
-import org.scm4j.vcs.api.VCSDiffEntry;
-import org.scm4j.vcs.api.VCSMergeResult;
-import org.scm4j.vcs.api.VCSTag;
-import org.scm4j.vcs.api.WalkDirection;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.PathFilter;
+import org.scm4j.vcs.api.*;
 import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
 import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
@@ -64,6 +28,12 @@ import org.scm4j.vcs.api.exceptions.EVCSTagExists;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
+
+import java.io.*;
+import java.net.*;
+import java.net.Proxy.Type;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class GitVCS implements IVCS {
 
@@ -319,25 +289,30 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
 
-			checkout(git, gitRepo, branchName, revision);
-			File file = new File(wc.getFolder(), fileRelativePath);
-			if (!file.exists()) {
+			git
+					.fetch()
+					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
+					//.setRemoveDeletedRefs(true)
+					.setCredentialsProvider(credentials)
+					.call();
+			git.pull().call(); //TODO: add test when we receive correct file version if we change it from another LWC
+			RevWalk revWalk = new RevWalk(gitRepo);
+			TreeWalk treeWalk = new TreeWalk(gitRepo);
+			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName)  : revision);
+			RevCommit commit = revWalk.parseCommit(revisionCommitId);
+			RevTree tree = commit.getTree();
+			treeWalk.addTree(tree);
+			treeWalk.setRecursive(true);
+			treeWalk.setFilter(PathFilter.create(fileRelativePath));
+			if (!treeWalk.next()) {
 				throw new EVCSFileNotFound(String.format("File %s is not found", fileRelativePath));
 			}
-			String res = IOUtils.toString(file.toURI(), StandardCharsets.UTF_8);
-			
-			if (revision != null) {
-				// leaving Detached HEAD state
-				String bn = getRealBranchName(branchName);
-				git
-						.checkout()
-						.setStartPoint("origin/" + bn)
-						.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
-						.setUpstreamMode(SetupUpstreamMode.TRACK)
-						.setName(bn)
-						.call();
-			}
-			return res;
+			ObjectId objectId = treeWalk.getObjectId(0);
+
+			ObjectLoader loader = gitRepo.open(objectId);
+			InputStream in = loader.openStream();
+			return IOUtils.toString(in, StandardCharsets.UTF_8);
+
 		} catch(EVCSFileNotFound e) {
 			throw e;
 		} catch (GitAPIException e) {
@@ -469,15 +444,9 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-			
-			git
-					.pull()
-					.call();
 
-			List<Ref> refs = git
-					.branchList()
-					.setListMode(ListMode.REMOTE)
-					.call();
+			git.pull().call(); //TODO: add test when we receive correct branches list if we change it from another LWC
+			Collection<Ref> refs = gitRepo.getRefDatabase().getRefs(REFS_REMOTES_ORIGIN).values();
 			Set<String> res = new HashSet<>();
 			String bn;
 			for (Ref ref : refs) {
@@ -728,11 +697,9 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
-			
-			git
-					.pull()
-					.call();
-			
+
+			updateLocalTags(git);
+
 			RevCommit commitToTag = revisionToTag == null ? null : rw.parseCommit(ObjectId.fromString(revisionToTag));
 			
 			Ref ref = git
@@ -758,14 +725,28 @@ public class GitVCS implements IVCS {
 		}
 	}
 
+	private void updateLocalTags(Git git) throws Exception {
+		// need to remove tags from local repo which are removed in origin
+		git
+				.fetch()
+				.setRefSpecs(new RefSpec("+refs/tags/*:refs/tags/*"))
+				.setRemoveDeletedRefs(true)
+				.setCredentialsProvider(credentials)
+				.call();
+		git
+				.pull()
+				.call();
+	}
+
 	@Override
 	public List<VCSTag> getTags() {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
-			
-			List<Ref> tagRefs = getTagRefs(git);
+
+			updateLocalTags(git);
+			Collection<Ref> tagRefs = gitRepo.getTags().values();
 	        List<VCSTag> res = new ArrayList<>();
 	        RevCommit revCommit;
 	        for (Ref ref : tagRefs) {
@@ -789,18 +770,18 @@ public class GitVCS implements IVCS {
 		}
 	}
 	
-	private List<Ref> getTagRefs(Git git) throws Exception {
-		// need to remove tags from local repo which are removed in origin
-		git
-				.fetch()
-				.setRefSpecs(new RefSpec("+refs/tags/*:refs/tags/*"))
-				.setRemoveDeletedRefs(true)
-				.setCredentialsProvider(credentials)
-				.call();
-		return git
-				.tagList()
-				.call();
-	}
+//	private List<Ref> getTagRefs(Git git) throws Exception {
+//		// need to remove tags from local repo which are removed in origin
+//		git
+//				.fetch()
+//				.setRefSpecs(new RefSpec("+refs/tags/*:refs/tags/*"))
+//				.setRemoveDeletedRefs(true)
+//				.setCredentialsProvider(credentials)
+//				.call();
+//		return git
+//				.tagList()
+//				.call();
+//	}
 
 	@Override
 	public void removeTag(String tagName) {
@@ -808,8 +789,8 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
-			
-			git.pull().call();
+
+			updateLocalTags(git);
 
 			git
 					.tagDelete()
@@ -817,8 +798,7 @@ public class GitVCS implements IVCS {
 					.call();
 		
 			push(git, new RefSpec(":refs/tags/" + tagName));
-			
-			
+
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -846,10 +826,11 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
-			
+
+			updateLocalTags(git);
+
 			List<VCSTag> res = new ArrayList<>();
-			
-			List<Ref> tagRefs = getTagRefs(git);
+			Collection<Ref> tagRefs = gitRepo.getTags().values();
 			RevCommit revCommit;
 			for (Ref ref : tagRefs) {
 				ObjectId relatedCommitObjectId = ref.getPeeledObjectId() == null ? ref.getObjectId() : ref.getPeeledObjectId();
