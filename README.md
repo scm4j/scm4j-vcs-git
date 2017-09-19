@@ -5,14 +5,12 @@
 # Overview
 scm4j-vcs-git is lightweight library for execute basic Git VCS operations (merge, branch create etc). It uses [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) exposing IVCS implementation for Git repositories and [JGit](https://eclipse.org/jgit/) as framework to work with Git repositories.
 Features:
-- Branch create and remove
+- Working wit branches: create, remove, browse
 - Branch merge with result return (success or list of conflicted files)
-- Branch commits messages list
 - Summarized diff between branches
-- Branches list
 - File content getting and setting
 - File create and remove
-- Working with tags
+- Working with tags: create, remove, browse
 
 # Terms
 - Workspace Home
