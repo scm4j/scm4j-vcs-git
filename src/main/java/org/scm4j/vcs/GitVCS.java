@@ -306,7 +306,7 @@ public class GitVCS implements IVCS {
 			treeWalk.setRecursive(true);
 			treeWalk.setFilter(PathFilter.create(fileRelativePath));
 			if (!treeWalk.next()) {
-				throw new EVCSFileNotFound(getRepoUrl(), getRealBranchName(branchName), revision, fileRelativePath);
+				throw new EVCSFileNotFound(getRepoUrl(), getRealBranchName(branchName), fileRelativePath, revision);
 			}
 			ObjectId objectId = treeWalk.getObjectId(0);
 
