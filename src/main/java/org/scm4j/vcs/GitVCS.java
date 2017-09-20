@@ -298,8 +298,11 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.call();
 			git.pull().call(); //TODO: add test when we receive correct file version if we change it from another LWC
-			
 			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName)  : revision);
+			if (revision == null && revisionCommitId == null) {
+				throw new EVCSBranchNotFound(getRepoUrl(), getRealBranchName(branchName)); 
+			}
+			
 			RevCommit commit = revWalk.parseCommit(revisionCommitId);
 			RevTree tree = commit.getTree();
 			treeWalk.addTree(tree);
