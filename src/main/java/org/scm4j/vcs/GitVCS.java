@@ -22,6 +22,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.scm4j.vcs.api.*;
 import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
+import org.scm4j.vcs.api.exceptions.EVCSBranchNotFound;
 import org.scm4j.vcs.api.exceptions.EVCSException;
 import org.scm4j.vcs.api.exceptions.EVCSFileNotFound;
 import org.scm4j.vcs.api.exceptions.EVCSTagExists;
@@ -105,6 +106,7 @@ public class GitVCS implements IVCS {
 			
 			git
 					.pull()
+					.setCredentialsProvider(credentials)
 					.call();
 			
 			RevCommit commitToTag = revisionToTag == null ? null : rw.parseCommit(ObjectId.fromString(revisionToTag));
@@ -294,10 +296,13 @@ public class GitVCS implements IVCS {
 			git
 					.fetch()
 					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
-					//.setRemoveDeletedRefs(true)
 					.setCredentialsProvider(credentials)
 					.call();
-			git.pull().call(); //TODO: add test when we receive correct file version if we change it from another LWC
+			git
+					.pull()
+					.setCredentialsProvider(credentials)
+					.call(); //TODO: add test when we receive correct file version if we change it from another LWC
+			
 			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName)  : revision);
 			if (revision == null && revisionCommitId == null) {
 				throw new EVCSBranchNotFound(getRepoUrl(), getRealBranchName(branchName)); 
@@ -371,6 +376,7 @@ public class GitVCS implements IVCS {
 		if (revision == null) {
 			git
 					.pull()
+					.setCredentialsProvider(credentials)
 					.call();
 			cmd
 					.setStartPoint("origin/" + bn)
@@ -449,7 +455,11 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
 
-			git.pull().call(); //TODO: add test when we receive correct branches list if we change it from another LWC
+			git
+					.pull()
+					.setCredentialsProvider(credentials)
+					.call(); //TODO: add test when we receive correct branches list if we change it from another LWC
+			
 			Collection<Ref> refs = gitRepo.getRefDatabase().getRefs(REFS_REMOTES_ORIGIN).values();
 			Set<String> res = new HashSet<>();
 			String bn;
@@ -739,6 +749,7 @@ public class GitVCS implements IVCS {
 				.call();
 		git
 				.pull()
+				.setCredentialsProvider(credentials)
 				.call();
 	}
 
@@ -774,19 +785,6 @@ public class GitVCS implements IVCS {
 		}
 	}
 	
-//	private List<Ref> getTagRefs(Git git) throws Exception {
-//		// need to remove tags from local repo which are removed in origin
-//		git
-//				.fetch()
-//				.setRefSpecs(new RefSpec("+refs/tags/*:refs/tags/*"))
-//				.setRemoveDeletedRefs(true)
-//				.setCredentialsProvider(credentials)
-//				.call();
-//		return git
-//				.tagList()
-//				.call();
-//	}
-
 	@Override
 	public void removeTag(String tagName) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
