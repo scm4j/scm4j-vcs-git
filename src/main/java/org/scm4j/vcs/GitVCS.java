@@ -322,7 +322,7 @@ public class GitVCS implements IVCS {
 			InputStream in = loader.openStream();
 			return IOUtils.toString(in, StandardCharsets.UTF_8);
 
-		} catch(EVCSFileNotFound e) {
+		} catch(EVCSException e) {
 			throw e;
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
