@@ -1,9 +1,34 @@
 package org.scm4j.vcs;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.Authenticator;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.Proxy;
+import java.net.Proxy.Type;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.eclipse.jgit.api.*;
+import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.LogCommand;
+import org.eclipse.jgit.api.MergeResult;
+import org.eclipse.jgit.api.PushCommand;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -11,8 +36,18 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.lib.*;
-import org.eclipse.jgit.revwalk.*;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.RefSpec;
@@ -20,7 +55,13 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.scm4j.vcs.api.*;
+import org.scm4j.vcs.api.IVCS;
+import org.scm4j.vcs.api.VCSChangeType;
+import org.scm4j.vcs.api.VCSCommit;
+import org.scm4j.vcs.api.VCSDiffEntry;
+import org.scm4j.vcs.api.VCSMergeResult;
+import org.scm4j.vcs.api.VCSTag;
+import org.scm4j.vcs.api.WalkDirection;
 import org.scm4j.vcs.api.exceptions.EVCSBranchExists;
 import org.scm4j.vcs.api.exceptions.EVCSBranchNotFound;
 import org.scm4j.vcs.api.exceptions.EVCSException;
@@ -29,12 +70,6 @@ import org.scm4j.vcs.api.exceptions.EVCSTagExists;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
-
-import java.io.*;
-import java.net.*;
-import java.net.Proxy.Type;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
 
 public class GitVCS implements IVCS {
 
@@ -73,7 +108,7 @@ public class GitVCS implements IVCS {
 					.setDirectory(new File(folder))
 					.setURI(repo.getRepoUrl())
 					.setCredentialsProvider(credentials)
-					.setNoCheckout(true)
+					.setNoCheckout(false)
 					.setCloneAllBranches(true)
 					.call()
 					.close();
@@ -322,7 +357,7 @@ public class GitVCS implements IVCS {
 			InputStream in = loader.openStream();
 			return IOUtils.toString(in, StandardCharsets.UTF_8);
 
-		} catch(EVCSFileNotFound e) {
+		} catch(EVCSFileNotFound | EVCSBranchNotFound e) {
 			throw e;
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
@@ -585,7 +620,7 @@ public class GitVCS implements IVCS {
 			throw new RuntimeException(e);
 		}
 	}
-
+	
 	private RevCommit getInitialCommit(Repository gitRepo, String branchName) throws Exception {
 		try (RevWalk rw = new RevWalk(gitRepo)) {
 			Ref ref = gitRepo.exactRef("refs/heads/" + branchName);
@@ -752,6 +787,8 @@ public class GitVCS implements IVCS {
 				.setCredentialsProvider(credentials)
 				.call();
 	}
+	
+	
 
 	@Override
 	public List<VCSTag> getTags() {
@@ -832,21 +869,23 @@ public class GitVCS implements IVCS {
 			updateLocalTags(git);
 
 			List<VCSTag> res = new ArrayList<>();
-			Collection<Ref> tagRefs = gitRepo.getTags().values();
+			
+			Collection<Ref> refs = gitRepo.getAllRefsByPeeledObjectId().get(gitRepo.resolve(revision));
 			RevCommit revCommit;
-			for (Ref ref : tagRefs) {
+			for (Ref ref : refs == null ? new ArrayList<Ref>() : refs) {
+				if (!ref.getName().contains("refs/tags/")) {
+					continue;
+				}
 				ObjectId relatedCommitObjectId = ref.getPeeledObjectId() == null ? ref.getObjectId() : ref.getPeeledObjectId();
 	        	revCommit = rw.parseCommit(relatedCommitObjectId);
-				if (revCommit.getName().equals(revision)) {
-		        	VCSCommit relatedCommit = getVCSCommit(revCommit);
-		        	RevObject revObject = rw.parseAny(ref.getObjectId());
-		        	if (revObject instanceof RevTag) {
-		        		RevTag revTag = (RevTag) revObject;
-		        		res.add(new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit));
-		        	} else  {
-		        		res.add(new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit));
-		        	}
-				}
+	        	VCSCommit relatedCommit = getVCSCommit(revCommit);
+	        	RevObject revObject = rw.parseAny(ref.getObjectId());
+	        	if (revObject instanceof RevTag) {
+	        		RevTag revTag = (RevTag) revObject;
+	        		res.add(new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit));
+	        	} else  {
+	        		res.add(new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit));
+	        	}
 			}
 			
 			return res;
@@ -856,4 +895,6 @@ public class GitVCS implements IVCS {
 			throw new RuntimeException(e);
 		}
 	}
+
+	
 }
