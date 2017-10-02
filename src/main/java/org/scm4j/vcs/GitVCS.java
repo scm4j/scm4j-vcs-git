@@ -683,7 +683,7 @@ public class GitVCS implements IVCS {
 			if (direction == WalkDirection.ASC) {
 				Collections.reverse(res);
 			}
-			if (limit != 0) {
+			if (limit > 0 && res.size() > limit) {
 				res = res.subList(0, limit);
 			}
 
