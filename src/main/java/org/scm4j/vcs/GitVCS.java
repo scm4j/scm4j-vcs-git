@@ -167,7 +167,7 @@ public class GitVCS implements IVCS {
 					.setForce(true) // avoid "not merged" exception
 					.call();
 
-			RefSpec refSpec = new RefSpec( ":refs/heads/" + branchName);
+			RefSpec refSpec = new RefSpec(":refs/heads/" + branchName);
 			
 			push(git, refSpec);
 		} catch (GitAPIException e) {
@@ -450,13 +450,13 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-
-			git
-					.fetch()
-					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
-					.setRemoveDeletedRefs(true)
-					.setCredentialsProvider(credentials)
-					.call();
+			// checkout conflict with files in releaser
+//			git
+//					.fetch()
+//					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
+//					.setRemoveDeletedRefs(true)
+//					.setCredentialsProvider(credentials)
+//					.call();
 
 			git
 					.pull()
