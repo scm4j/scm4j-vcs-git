@@ -12,12 +12,21 @@ Features:
 - File create and remove
 - Working with tags: create, remove, browse
 
+Use cases
+- VCS server hooks
+- Build machines
+  - checking in\out, tagging
+- Software project management systems
+  - Create own branches from GUI, browse commits, product versions management, etc
+- Product release automation
+  - automatic merging, forking, tagging, version bumping, etc
+  - Example: [scm4j-releaser](https://github.com/scm4j/scm4j-releaser)
+
+
 # Terms
 - Workspace Home
   - Home local folder of all folders used by vcs-related operations. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
-- Repository Workspace
-  - Local folder for LWC folders related to Repository of one type. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
-- Locked Working Copy, LWC
+- Locked Working Copy,
   - Local folder where vcs-related operations are executed. Provides thread- and process-safe repository of working folders. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Test Repository
   - Git repository which is used to execute functional tests

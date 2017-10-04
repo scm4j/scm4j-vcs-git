@@ -1,27 +1,5 @@
 package org.scm4j.vcs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.Authenticator;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.PasswordAuthentication;
-import java.net.Proxy;
-import java.net.ProxySelector;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.eclipse.jgit.api.Git;
@@ -44,6 +22,16 @@ import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
 import org.scm4j.vcs.api.workingcopy.VCSWorkspace;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.*;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.Assert.*;
+
 public class GitVCSTest extends VCSAbstractTest {
 
 	private Repository localGitRepo;
@@ -54,7 +42,7 @@ public class GitVCSTest extends VCSAbstractTest {
 	@Override
 	public void setUp() throws Exception {
 		super.setUp();
-		Git fileGitRepo = GitVCSUtils.createRepository(new File(localVCSWorkspace.getHomeFolder(), repoName));
+		Git fileGitRepo = GitVCSUtils.createRepository(new File(REPO_DIR, repoName));
 		localGitRepo = fileGitRepo.getRepository();
 		proxySelectorBackup = ProxySelector.getDefault();
 		ProxySelector.setDefault(null);
@@ -68,11 +56,6 @@ public class GitVCSTest extends VCSAbstractTest {
 		ProxySelector.setDefault(proxySelectorBackup);
 	}
 	
-	@Override
-	protected String getTestRepoUrl() {
-		return localVCSWorkspace.getHomeFolder().toURI().toString();
-	}
-
 	@Override
 	protected IVCS getVCS(IVCSRepositoryWorkspace mockedVCSRepo) {
 		return Mockito.spy(new GitVCS(mockedVCSRepo));
@@ -222,14 +205,12 @@ public class GitVCSTest extends VCSAbstractTest {
 				fail();
 			}
 		}
-		
 	}
 
 	private void testExceptionThrowing(Exception testException, Method m, Object[] params) throws Exception {
 		Mockito.reset(git);
 		Mockito.doThrow(testException).when(git).getLocalGit(mockedLWC);
 		testExceptionThrowingNoMock(testException, m, params);
-		
 	}
 
 	private Boolean wasGetLocalGitInvoked() throws Exception {
