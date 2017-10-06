@@ -69,8 +69,6 @@ public class GitVCS implements IVCS {
 					.setDirectory(new File(folder))
 					.setURI(repo.getRepoUrl())
 					.setCredentialsProvider(credentials)
-					.setNoCheckout(false)
-					.setCloneAllBranches(true)
 					.call()
 					.close();
 		}
@@ -374,6 +372,7 @@ public class GitVCS implements IVCS {
 				.setCredentialsProvider(credentials)
 				.call();
 		if (revision == null) {
+
 			cmd
 					.setStartPoint("origin/" + bn)
 					.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
@@ -450,18 +449,19 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-			// checkout conflict with files in releaser
-//			git
-//					.fetch()
-//					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
-//					.setRemoveDeletedRefs(true)
-//					.setCredentialsProvider(credentials)
-//					.call();
 
 			git
 					.pull()
 					.setCredentialsProvider(credentials)
 					.call();
+			git
+					.fetch()
+					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
+					.setRemoveDeletedRefs(true)
+					.setCredentialsProvider(credentials)
+					.call();
+
+
 
 			Collection<Ref> refs = gitRepo.getRefDatabase().getRefs(REFS_REMOTES_ORIGIN).values();
 			Set<String> res = new HashSet<>();
@@ -614,15 +614,13 @@ public class GitVCS implements IVCS {
 			 RevWalk rw = new RevWalk(gitRepo)) {
 
 			checkout(git, gitRepo, branchName, null);
-
 			String bn = getRealBranchName(branchName);
 
 			List<VCSCommit> res = new ArrayList<>();
 			RevCommit startCommit;
 			RevCommit endCommit;
 			if (direction == WalkDirection.ASC) {
-				Ref ref = gitRepo.exactRef("refs/heads/" + bn);
-				ObjectId headCommitId = ref.getObjectId();
+				ObjectId headCommitId = gitRepo.exactRef("refs/remotes/origin/" + bn).getObjectId();
 				startCommit = rw.parseCommit( headCommitId );
 				ObjectId sinceCommit = startFromCommitId == null ?
 						getInitialCommit(gitRepo, bn).getId() :
@@ -630,7 +628,7 @@ public class GitVCS implements IVCS {
 				endCommit = rw.parseCommit(sinceCommit);
 			} else {
 				ObjectId sinceCommit = startFromCommitId == null ?
-						gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
+						gitRepo.exactRef("refs/remotes/origin/" + bn).getObjectId() :
 						ObjectId.fromString(startFromCommitId);
 				startCommit = rw.parseCommit( sinceCommit );
 				endCommit = getInitialCommit(gitRepo, bn);
@@ -839,23 +837,24 @@ public class GitVCS implements IVCS {
 			updateLocalTags(git);
 
 			List<VCSTag> res = new ArrayList<>();
-			
-			Collection<Ref> refs = gitRepo.getAllRefsByPeeledObjectId().get(gitRepo.resolve(revision));
+
+			// getAllRefsByPeeledObject does not work. Does not return newelly created tag
+			Collection<Ref> tagRefs = gitRepo.getTags().values();
+
 			RevCommit revCommit;
-			for (Ref ref : refs == null ? new ArrayList<Ref>() : refs) {
-				if (!ref.getName().contains("refs/tags/")) {
-					continue;
-				}
+			for (Ref ref : tagRefs) {
 				ObjectId relatedCommitObjectId = ref.getPeeledObjectId() == null ? ref.getObjectId() : ref.getPeeledObjectId();
 	        	revCommit = rw.parseCommit(relatedCommitObjectId);
-	        	VCSCommit relatedCommit = getVCSCommit(revCommit);
-	        	RevObject revObject = rw.parseAny(ref.getObjectId());
-	        	if (revObject instanceof RevTag) {
-	        		RevTag revTag = (RevTag) revObject;
-	        		res.add(new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit));
-	        	} else  {
-	        		res.add(new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit));
-	        	}
+				if (revCommit.getName().equals(revision)) {
+					VCSCommit relatedCommit = getVCSCommit(revCommit);
+					RevObject revObject = rw.parseAny(ref.getObjectId());
+					if (revObject instanceof RevTag) {
+						RevTag revTag = (RevTag) revObject;
+						res.add(new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit));
+					} else {
+						res.add(new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit));
+					}
+				}
 			}
 			
 			return res;
