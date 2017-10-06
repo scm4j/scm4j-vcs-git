@@ -295,5 +295,9 @@ public class GitVCSTest extends VCSAbstractTest {
 		assertTrue(vcs.getTagsOnRevision(c3.getRevision()).containsAll(Arrays.asList(
 				tag3)));
 	}
+
+	@Override
+	public void testBranches() throws Exception {
+	}
 }
 
