@@ -285,7 +285,7 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk revWalk = new RevWalk(gitRepo);
-			 TreeWalk treeWalk = new TreeWalk(gitRepo);) {
+			 TreeWalk treeWalk = new TreeWalk(gitRepo)) {
 
 			git
 					.fetch()
@@ -314,8 +314,14 @@ public class GitVCS implements IVCS {
 
 			ObjectLoader loader = gitRepo.open(objectId);
 			InputStream in = loader.openStream();
-			return IOUtils.toString(in, StandardCharsets.UTF_8);
-
+			String res = IOUtils.toString(in, StandardCharsets.UTF_8);
+			if (revision != null) {
+				git
+						.reset()
+						.setMode(ResetType.HARD)
+						.call();
+			}
+			return res;
 		} catch(EVCSFileNotFound | EVCSBranchNotFound e) {
 			throw e;
 		} catch (GitAPIException e) {
