@@ -295,7 +295,7 @@ public class GitVCS implements IVCS {
 			git
 					.pull()
 					.setCredentialsProvider(credentials)
-					.call(); //TODO: add test when we receive correct file version if we change it from another LWC
+					.call();
 
 			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName)  : revision);
 			if (revision == null && revisionCommitId == null) {
