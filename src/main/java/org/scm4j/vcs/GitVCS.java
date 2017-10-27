@@ -676,6 +676,9 @@ public class GitVCS implements IVCS {
 			String bn = getRealBranchName(branchName);
 			
 			Ref ref = gitRepo.exactRef("refs/remotes/origin/" + bn);
+			if (ref == null) {
+				return null;
+			}
 			ObjectId commitId = ref.getObjectId();
 			return rw.parseCommit( commitId );
 		} catch (GitAPIException e) {
@@ -688,6 +691,9 @@ public class GitVCS implements IVCS {
 	@Override
 	public VCSCommit getHeadCommit(String branchName) {
 		RevCommit branchHeadCommit = getHeadRevCommit(getRealBranchName(branchName));
+		if (branchHeadCommit == null) {
+			return null;
+		}
 		return getVCSCommit(branchHeadCommit);
 	}
 	
