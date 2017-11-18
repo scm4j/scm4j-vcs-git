@@ -97,7 +97,7 @@ public class GitVCS implements IVCS {
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
-			
+
 			git
 					.pull()
 					.setCredentialsProvider(credentials)
@@ -263,8 +263,6 @@ public class GitVCS implements IVCS {
 		Authenticator.setDefault(new Authenticator() {
 			@Override
 			protected PasswordAuthentication getPasswordAuthentication() {
-				System.out.println(super.getRequestingSite().getHostName());
-				System.out.println(repo.getRepoUrl());
 				if (super.getRequestingSite().getHostName().contains(repo.getRepoUrl()) &&
 						super.getRequestingPort() == port) {
 					return new PasswordAuthentication(proxyUser, proxyPassword.toCharArray());
@@ -467,19 +465,13 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.call();
 
-
-
 			Collection<Ref> refs = gitRepo.getRefDatabase().getRefs(REFS_REMOTES_ORIGIN).values();
 			Set<String> res = new HashSet<>();
 			String bn;
 			for (Ref ref : refs) {
 				bn = ref.getName().replace(REFS_REMOTES_ORIGIN, "");
-				if (path == null) {
+				if (bn.startsWith(path == null ? "" : path)) {
 					res.add(bn);
-				} else {
-					if (bn.startsWith(path)) {
-						res.add(bn);
-					}
 				}
 			}
 			return res;
