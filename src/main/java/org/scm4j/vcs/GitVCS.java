@@ -48,7 +48,7 @@ public class GitVCS implements IVCS {
 		this.repo = repo;
 	}
 	
-	public void setCredentials(CredentialsProvider credentials) {
+	private void setCredentials(CredentialsProvider credentials) {
 		this.credentials = credentials;
 	}
 	
@@ -56,7 +56,7 @@ public class GitVCS implements IVCS {
 		return branchName == null ? MASTER_BRANCH_NAME : branchName;
 	}
 
-	protected Git getLocalGit(String folder) throws Exception {
+	Git getLocalGit(String folder) throws Exception {
 		Repository gitRepo = new FileRepositoryBuilder()
 				.setGitDir(new File(folder, ".git"))
 				.build();
@@ -75,7 +75,7 @@ public class GitVCS implements IVCS {
 		return new Git(gitRepo);
 	}
 	
-	protected Git getLocalGit(IVCSLockedWorkingCopy wc) throws Exception {
+	Git getLocalGit(IVCSLockedWorkingCopy wc) throws Exception {
 		return getLocalGit(wc.getFolder().getPath());
 	}
 	
@@ -368,7 +368,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	void checkout(Git git, Repository gitRepo, String branchName, String revision) throws Exception {
+	private void checkout(Git git, Repository gitRepo, String branchName, String revision) throws Exception {
 		String bn = getRealBranchName(branchName);
 		CheckoutCommand cmd = git.checkout();
 		git
@@ -545,7 +545,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	protected VCSCommit getVCSCommit(RevCommit revCommit) {
+	private VCSCommit getVCSCommit(RevCommit revCommit) {
 		return new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
 	}
 
