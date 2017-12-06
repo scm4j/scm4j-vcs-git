@@ -24,7 +24,6 @@ import org.scm4j.vcs.api.*;
 import org.scm4j.vcs.api.exceptions.*;
 import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
-import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
 
 import java.io.*;
 import java.net.*;
@@ -143,7 +142,7 @@ public class GitVCS implements IVCS {
 
 			push(git, refSpec);
 		} catch (RefAlreadyExistsException e) {
-			throw new EVCSBranchExists (e);
+			throw new EVCSBranchExists(newBranchName);
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -176,7 +175,7 @@ public class GitVCS implements IVCS {
 	}
 
 	private void push(Git git, RefSpec refSpec) throws GitAPIException {
-		PushCommand cmd =  git
+		PushCommand cmd = git
 				.push();
 		if (refSpec != null) {
 			cmd.setRefSpecs(refSpec);
@@ -295,7 +294,7 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.call();
 
-			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName)  : revision);
+			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName) : revision);
 			if (revision == null && revisionCommitId == null) {
 				throw new EVCSBranchNotFound(getRepoUrl(), getRealBranchName(branchName));
 			}
@@ -313,7 +312,9 @@ public class GitVCS implements IVCS {
 			ObjectLoader loader = gitRepo.open(objectId);
 			InputStream in = loader.openStream();
 			String res = IOUtils.toString(in, StandardCharsets.UTF_8);
+
 			if (revision != null) {
+				// need to prevent "checkout conflict with files" exception on scm4j-releaser testTagExistsOnExecute() test
 				git
 						.reset()
 						.setMode(ResetType.HARD)
@@ -496,10 +497,10 @@ public class GitVCS implements IVCS {
 				log.setMaxCount(limit);
 			}
 			
-			Iterable<RevCommit> logs = log.call();
+			Iterable<RevCommit> commits = log.call();
 			
 			List<VCSCommit> res = new ArrayList<>();
-			for (RevCommit commit : logs) {
+			for (RevCommit commit : commits) {
 				res.add(getVCSCommit(commit));
 			}
 			
@@ -549,7 +550,7 @@ public class GitVCS implements IVCS {
 		return new VCSCommit(revCommit.getName(), revCommit.getFullMessage(), revCommit.getAuthorIdent().getName());
 	}
 
-	public List<VCSCommit> getCommitsRange(String branchName, String afterCommitId, String untilCommitId) {
+	public List<VCSCommit> getCommitsRange(String branchName, String startRevision, String endRevision) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
@@ -558,18 +559,18 @@ public class GitVCS implements IVCS {
 
 			String bn = getRealBranchName(branchName);
 
-			ObjectId sinceCommit = afterCommitId == null ?
+			ObjectId startCommit = startRevision == null ?
 					getInitialCommit(gitRepo, bn).getId() :
-					ObjectId.fromString(afterCommitId);
+					ObjectId.fromString(startRevision);
 
-			ObjectId untilCommit = untilCommitId == null ?
+			ObjectId endCommit = endRevision == null ?
 					gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
-					ObjectId.fromString(untilCommitId);
+					ObjectId.fromString(endRevision);
 
 			Iterable<RevCommit> commits;
 			commits = git
 					.log()
-					.addRange(sinceCommit, untilCommit)
+					.addRange(startCommit, endCommit)
 					.call();
 
 			List<VCSCommit> res = new ArrayList<>();
@@ -599,13 +600,8 @@ public class GitVCS implements IVCS {
 	}
 
 	@Override
-	public IVCSWorkspace getWorkspace() {
-		return repo.getWorkspace();
-	}
-
-	@Override
-	public List<VCSCommit> getCommitsRange(String branchName, String startFromCommitId, WalkDirection direction,
-			int limit) {
+	public List<VCSCommit> getCommitsRange(String branchName, String startRevision, WalkDirection direction,
+										   int limit) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
@@ -620,15 +616,15 @@ public class GitVCS implements IVCS {
 			if (direction == WalkDirection.ASC) {
 				ObjectId headCommitId = gitRepo.exactRef("refs/remotes/origin/" + bn).getObjectId();
 				startCommit = rw.parseCommit( headCommitId );
-				ObjectId sinceCommit = startFromCommitId == null ?
+				ObjectId startCommitObjectId = startRevision == null ?
 						getInitialCommit(gitRepo, bn).getId() :
-						ObjectId.fromString(startFromCommitId);
-				endCommit = rw.parseCommit(sinceCommit);
+						ObjectId.fromString(startRevision);
+				endCommit = rw.parseCommit(startCommitObjectId);
 			} else {
-				ObjectId sinceCommit = startFromCommitId == null ?
+				ObjectId endCommitObjectId = startRevision == null ?
 						gitRepo.exactRef("refs/remotes/origin/" + bn).getObjectId() :
-						ObjectId.fromString(startFromCommitId);
-				startCommit = rw.parseCommit( sinceCommit );
+						ObjectId.fromString(startRevision);
+				startCommit = rw.parseCommit( endCommitObjectId );
 				endCommit = getInitialCommit(gitRepo, bn);
 			}
 
