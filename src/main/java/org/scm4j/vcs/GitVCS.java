@@ -331,6 +331,9 @@ public class GitVCS implements IVCS {
 	}
 	
 	public VCSCommit setFilesContent(String branchName, List<String> filePathes, List<String> contents, String commitMessage) {
+		if (filePathes.isEmpty()) {
+			return null;
+		}
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 				 Git git = getLocalGit(wc);
 				 Repository gitRepo = git.getRepository()) {
@@ -338,7 +341,7 @@ public class GitVCS implements IVCS {
 				checkout(git, gitRepo, branchName, null);
 				CommitCommand commitCommand = git.commit();
 				int contentId = 0;
-				for (int filePathId = 0; filePathId <= filePathes.size(); filePathId++) {
+				for (int filePathId = 0; filePathId < filePathes.size(); filePathId++) {
 					String filePath = filePathes.get(filePathId);
 					File file = new File(wc.getFolder(), filePath);
 					if (!file.exists()) {
@@ -373,41 +376,7 @@ public class GitVCS implements IVCS {
 
 	@Override
 	public VCSCommit setFileContent(String branchName, String filePath, String content, String commitMessage) {
-		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
-			 Git git = getLocalGit(wc);
-			 Repository gitRepo = git.getRepository()) {
-			
-			checkout(git, gitRepo, branchName, null);
-
-			File file = new File(wc.getFolder(), filePath);
-			if (!file.exists()) {
-				FileUtils.forceMkdir(file.getParentFile());
-				file.createNewFile();
-				git
-						.add()
-						.addFilepattern(filePath)
-						.call();
-			}
-
-			try (FileWriter fw = new FileWriter(file, false)) {
-				fw.write(content);
-			}
-
-			RevCommit newCommit = git
-					.commit()
-					.setOnly(filePath)
-					.setMessage(commitMessage)
-					.call();
-
-			String bn = getRealBranchName(branchName);
-			RefSpec refSpec = new RefSpec(bn + ":" + bn);
-			push(git, refSpec);
-			return getVCSCommit(newCommit);
-		} catch (GitAPIException e) {
-			throw new EVCSException(e);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+		return setFilesContent(branchName, Collections.singletonList(filePath), Collections.singletonList(content), commitMessage);
 	}
 
 	private void checkout(Git git, Repository gitRepo, String branchName, String revision) throws Exception {
