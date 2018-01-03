@@ -285,12 +285,14 @@ public class GitVCS implements IVCS {
 			 TreeWalk treeWalk = new TreeWalk(gitRepo)) {
 
 			git
-					.fetch()
-					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
+					.pull()
 					.setCredentialsProvider(credentials)
 					.call();
+
+			// if executed first then version is considered as modified. So have uncommited change: 19.5-SNAPSHOT -> 18.5-SNAPSHOT
 			git
-					.pull()
+					.fetch()
+					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
 					.setCredentialsProvider(credentials)
 					.call();
 
@@ -754,16 +756,18 @@ public class GitVCS implements IVCS {
 
 	private void updateLocalTags(Git git) throws Exception {
 		// need to remove tags from local repo which are removed in origin
+
+		git
+				.pull()
+				.setCredentialsProvider(credentials)
+				.call();
 		git
 				.fetch()
 				.setRefSpecs(new RefSpec("+refs/tags/*:refs/tags/*"))
 				.setRemoveDeletedRefs(true)
 				.setCredentialsProvider(credentials)
 				.call();
-		git
-				.pull()
-				.setCredentialsProvider(credentials)
-				.call();
+
 	}
 	
 	
