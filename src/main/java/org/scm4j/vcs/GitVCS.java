@@ -36,6 +36,8 @@ public class GitVCS implements IVCS {
 	public static final String GIT_VCS_TYPE_STRING = "git";
 	private static final String MASTER_BRANCH_NAME = "master";
 	private static final String REFS_REMOTES_ORIGIN = Constants.R_REMOTES + Constants.DEFAULT_REMOTE_NAME + "/";
+	private static final String REFS_HEADS = Constants.R_HEADS;
+	private static final String REFS_TAGS = Constants.R_TAGS;
 	private CredentialsProvider credentials;
 	private final IVCSRepositoryWorkspace repo;
 	
@@ -296,7 +298,7 @@ public class GitVCS implements IVCS {
 					.setCredentialsProvider(credentials)
 					.call();
 
-			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? "refs/heads/" + getRealBranchName(branchName) : revision);
+			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? REFS_HEADS + getRealBranchName(branchName) : revision);
 			if (revision == null && revisionCommitId == null) {
 				throw new EVCSBranchNotFound(getRepoUrl(), getRealBranchName(branchName));
 			}
@@ -393,7 +395,7 @@ public class GitVCS implements IVCS {
 		if (revision == null) {
 			cmd
 					.setStartPoint("origin/" + bn)
-					.setCreateBranch(gitRepo.exactRef("refs/heads/" + bn) == null)
+					.setCreateBranch(gitRepo.exactRef(REFS_HEADS + bn) == null)
 					.setUpstreamMode(SetupUpstreamMode.TRACK)
 					.setName(bn)
 					.call();
@@ -504,7 +506,7 @@ public class GitVCS implements IVCS {
 				
 			LogCommand log = git
 					.log()
-					.add(gitRepo.resolve("refs/remotes/origin/" + getRealBranchName(branchName)));
+					.add(gitRepo.resolve(REFS_REMOTES_ORIGIN + getRealBranchName(branchName)));
 
 			if (limit > 0) {
 				log.setMaxCount(limit);
@@ -577,7 +579,7 @@ public class GitVCS implements IVCS {
 					ObjectId.fromString(startRevision);
 
 			ObjectId endCommit = endRevision == null ?
-					gitRepo.exactRef("refs/heads/" + bn).getObjectId() :
+					gitRepo.exactRef(REFS_HEADS + bn).getObjectId() :
 					ObjectId.fromString(endRevision);
 
 			Iterable<RevCommit> commits;
@@ -603,7 +605,7 @@ public class GitVCS implements IVCS {
 	
 	private RevCommit getInitialCommit(Repository gitRepo, String branchName) throws Exception {
 		try (RevWalk rw = new RevWalk(gitRepo)) {
-			Ref ref = gitRepo.exactRef("refs/heads/" + branchName);
+			Ref ref = gitRepo.exactRef(REFS_HEADS + branchName);
 			ObjectId headCommitId = ref.getObjectId();
 			RevCommit root = rw.parseCommit(headCommitId);
 			rw.markStart(root);
@@ -627,7 +629,7 @@ public class GitVCS implements IVCS {
 			RevCommit startCommit;
 			RevCommit endCommit;
 			if (direction == WalkDirection.ASC) {
-				ObjectId headCommitId = gitRepo.exactRef("refs/remotes/origin/" + bn).getObjectId();
+				ObjectId headCommitId = gitRepo.exactRef(REFS_REMOTES_ORIGIN + bn).getObjectId();
 				startCommit = rw.parseCommit( headCommitId );
 				ObjectId startCommitObjectId = startRevision == null ?
 						getInitialCommit(gitRepo, bn).getId() :
@@ -635,7 +637,7 @@ public class GitVCS implements IVCS {
 				endCommit = rw.parseCommit(startCommitObjectId);
 			} else {
 				ObjectId endCommitObjectId = startRevision == null ?
-						gitRepo.exactRef("refs/remotes/origin/" + bn).getObjectId() :
+						gitRepo.exactRef(REFS_REMOTES_ORIGIN + bn).getObjectId() :
 						ObjectId.fromString(startRevision);
 				startCommit = rw.parseCommit( endCommitObjectId );
 				endCommit = getInitialCommit(gitRepo, bn);
@@ -676,7 +678,7 @@ public class GitVCS implements IVCS {
 
 			String bn = getRealBranchName(branchName);
 			
-			Ref ref = gitRepo.exactRef("refs/remotes/origin/" + bn);
+			Ref ref = gitRepo.exactRef(REFS_REMOTES_ORIGIN + bn);
 			if (ref == null) {
 				return null;
 			}
@@ -795,7 +797,7 @@ public class GitVCS implements IVCS {
 	        		tag = new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit);
 	        	} else  {
 	        		// tag is unannotated
-	        		tag = new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit);
+	        		tag = new VCSTag(ref.getName().replace(REFS_TAGS, ""), null, null, relatedCommit);
 	        	}
 	        	res.add(tag);
 	        }
@@ -867,7 +869,7 @@ public class GitVCS implements IVCS {
 						RevTag revTag = (RevTag) revObject;
 						res.add(new VCSTag(revTag.getTagName(), revTag.getFullMessage(), revTag.getTaggerIdent().getName(), relatedCommit));
 					} else {
-						res.add(new VCSTag(ref.getName().replace("refs/tags/", ""), null, null, relatedCommit));
+						res.add(new VCSTag(ref.getName().replace(REFS_TAGS, ""), null, null, relatedCommit));
 					}
 				}
 			}
