@@ -277,18 +277,9 @@ public class GitVCS implements IVCS {
 	public String getRepoUrl() {
 		return repo.getRepoUrl(); 
 	}
-
+	
 	@Override
-	public String getFileContentFromBranch(String branchName, String filePath) throws EVCSFileNotFound {
-		return getFileContent(branchName, filePath, null);
-	}
-
-	@Override
-	public String getFileContentFromRevision(String revision, String filePath) throws EVCSFileNotFound {
-		return getFileContent(null, filePath, revision);
-	}
-
-	private String getFileContent(String branchName, String fileRelativePath, String revision) {
+	public String getFileContent(String branchName, String fileRelativePath, String revision) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
@@ -318,7 +309,7 @@ public class GitVCS implements IVCS {
 			treeWalk.setRecursive(true);
 			treeWalk.setFilter(PathFilter.create(fileRelativePath));
 			if (!treeWalk.next()) {
-				throw new EVCSFileNotFound(getRepoUrl(), fileRelativePath, revisionCommitId.getName());
+				throw new EVCSFileNotFound(getRepoUrl(), getRealBranchName(branchName), fileRelativePath, revision);
 			}
 			ObjectId objectId = treeWalk.getObjectId(0);
 
