@@ -670,20 +670,22 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private RevCommit getHeadRevCommit (String branchName) {
+	@Override
+	public VCSCommit getHeadCommit (String branchName) {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 
-			String bn = getRealBranchName(branchName);
-			
-			Ref ref = gitRepo.exactRef(REFS_REMOTES_ORIGIN + bn);
+			checkout(git, gitRepo, null, null);
+
+			Ref ref = gitRepo.exactRef(REFS_REMOTES_ORIGIN + getRealBranchName(branchName));
 			if (ref == null) {
 				return null;
 			}
 			ObjectId commitId = ref.getObjectId();
-			return rw.parseCommit( commitId );
+			RevCommit revCommit = rw.parseCommit( commitId );
+			return getVCSCommit(revCommit);
 		} catch (GitAPIException e) {
 			throw new EVCSException(e);
 		} catch (Exception e) {
@@ -691,15 +693,6 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	@Override
-	public VCSCommit getHeadCommit(String branchName) {
-		RevCommit branchHeadCommit = getHeadRevCommit(getRealBranchName(branchName));
-		if (branchHeadCommit == null) {
-			return null;
-		}
-		return getVCSCommit(branchHeadCommit);
-	}
-	
 	@Override
 	public String toString() {
 		return "GitVCS [url=" + repo.getRepoUrl() + "]";
