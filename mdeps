@@ -1,2 +1,2 @@
-com.github.scm4j:scm4j-vcs-api:master-SNAPSHOT
-com.github.scm4j:scm4j-vcs-test:master-SNAPSHOT
+com.github.scm4j:scm4j-vcs-api:1.16.0
+com.github.scm4j:scm4j-vcs-test:1.17.0
