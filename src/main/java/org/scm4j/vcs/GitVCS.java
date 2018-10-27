@@ -5,8 +5,17 @@ import org.apache.commons.io.IOUtils;
 import org.eclipse.jgit.api.*;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
+import org.eclipse.jgit.api.errors.CanceledException;
+import org.eclipse.jgit.api.errors.DetachedHeadException;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidConfigurationException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
+import org.eclipse.jgit.api.errors.RefNotAdvertisedException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.api.errors.TransportException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffEntry.Side;
@@ -132,7 +141,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository()) {
 
 			checkout(git, gitRepo, srcBranchName, null);
-
+			
 			git
 					.branchCreate()
 					.setUpstreamMode(SetupUpstreamMode.TRACK)
@@ -176,7 +185,7 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private void push(Git git, RefSpec refSpec) throws GitAPIException {
+	void push(Git git, RefSpec refSpec) throws GitAPIException {
 		PushCommand cmd = git
 				.push();
 		if (refSpec != null) {
@@ -285,18 +294,8 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk revWalk = new RevWalk(gitRepo);
 			 TreeWalk treeWalk = new TreeWalk(gitRepo)) {
-
-			git
-					.pull()
-					.setCredentialsProvider(credentials)
-					.call();
-
-			// if executed first then version is considered as modified. So have uncommited change: 19.5-SNAPSHOT -> 18.5-SNAPSHOT
-			git
-					.fetch()
-					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
-					.setCredentialsProvider(credentials)
-					.call();
+			
+			pullAndFetch(git);
 
 			ObjectId revisionCommitId = gitRepo.resolve(revision == null ? REFS_HEADS + getRealBranchName(branchName) : revision);
 			if (revision == null && revisionCommitId == null) {
@@ -388,10 +387,9 @@ public class GitVCS implements IVCS {
 	private void checkout(Git git, Repository gitRepo, String branchName, String revision) throws Exception {
 		String bn = getRealBranchName(branchName);
 		CheckoutCommand cmd = git.checkout();
-		git
-				.pull()
-				.setCredentialsProvider(credentials)
-				.call();
+		
+		pullAndFetch(git);
+		
 		if (revision == null) {
 			cmd
 					.setStartPoint("origin/" + bn)
@@ -409,6 +407,27 @@ public class GitVCS implements IVCS {
 						.call();
 			}
 		}
+	}
+
+	private void pullAndFetch(Git git) throws GitAPIException, WrongRepositoryStateException,
+			InvalidConfigurationException, DetachedHeadException, InvalidRemoteException, CanceledException,
+			RefNotFoundException, RefNotAdvertisedException, NoHeadException, TransportException {
+		git
+				.pull()
+				.setCredentialsProvider(credentials)
+				.call();
+		
+		// remove local branches and tags which are not exists on remote
+		// See https://github.com/scm4j/scm4j-releaser/issues/59
+		// if executed first then version is considered as modified. So have uncommited change: 19.5-SNAPSHOT -> 18.5-SNAPSHOT
+		git
+				.fetch()
+				.setRefSpecs(
+						new RefSpec("+refs/heads/*:refs/heads/*"),
+						new RefSpec("+refs/tags/*:refs/tags/*"))
+				.setRemoveDeletedRefs(true)
+				.setCredentialsProvider(credentials)
+				.call();
 	}
 
 	@Override
@@ -469,18 +488,9 @@ public class GitVCS implements IVCS {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
 			 Git git = getLocalGit(wc);
 			 Repository gitRepo = git.getRepository()) {
-
-			git
-					.pull()
-					.setCredentialsProvider(credentials)
-					.call();
-			git
-					.fetch()
-					.setRefSpecs(new RefSpec("+refs/heads/*:refs/heads/*"))
-					.setRemoveDeletedRefs(true)
-					.setCredentialsProvider(credentials)
-					.call();
-
+			
+			pullAndFetch(git);
+			
 			Collection<Ref> refs = gitRepo.getRefDatabase().getRefs(REFS_REMOTES_ORIGIN).values();
 			Set<String> res = new HashSet<>();
 			String bn;
@@ -721,7 +731,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 
-			updateLocalTags(git);
+			pullAndFetch(git);
 
 			checkout(git, gitRepo, branchName, null);
 
@@ -750,24 +760,6 @@ public class GitVCS implements IVCS {
 		}
 	}
 
-	private void updateLocalTags(Git git) throws Exception {
-		// need to remove tags from local repo which are removed in origin
-
-		git
-				.pull()
-				.setCredentialsProvider(credentials)
-				.call();
-		git
-				.fetch()
-				.setRefSpecs(new RefSpec("+refs/tags/*:refs/tags/*"))
-				.setRemoveDeletedRefs(true)
-				.setCredentialsProvider(credentials)
-				.call();
-
-	}
-	
-	
-
 	@Override
 	public List<VCSTag> getTags() {
 		try (IVCSLockedWorkingCopy wc = repo.getVCSLockedWorkingCopy();
@@ -775,7 +767,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 
-			updateLocalTags(git);
+			pullAndFetch(git);
 			Collection<Ref> tagRefs = gitRepo.getTags().values();
 	        List<VCSTag> res = new ArrayList<>();
 	        RevCommit revCommit;
@@ -807,7 +799,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 
-			updateLocalTags(git);
+			pullAndFetch(git);
 
 			git
 					.tagDelete()
@@ -844,7 +836,7 @@ public class GitVCS implements IVCS {
 			 Repository gitRepo = git.getRepository();
 			 RevWalk rw = new RevWalk(gitRepo)) {
 
-			updateLocalTags(git);
+			pullAndFetch(git);
 
 			List<VCSTag> res = new ArrayList<>();
 

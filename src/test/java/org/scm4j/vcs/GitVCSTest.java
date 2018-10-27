@@ -1,5 +1,27 @@
 package org.scm4j.vcs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.Authenticator;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.List;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.eclipse.jgit.api.Git;
@@ -7,6 +29,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.CredentialItem;
+import org.eclipse.jgit.transport.RefSpec;
 import org.junit.After;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -21,16 +44,6 @@ import org.scm4j.vcs.api.workingcopy.IVCSLockedWorkingCopy;
 import org.scm4j.vcs.api.workingcopy.IVCSRepositoryWorkspace;
 import org.scm4j.vcs.api.workingcopy.IVCSWorkspace;
 import org.scm4j.vcs.api.workingcopy.VCSWorkspace;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.*;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.junit.Assert.*;
 
 public class GitVCSTest extends VCSAbstractTest {
 
@@ -294,6 +307,43 @@ public class GitVCSTest extends VCSAbstractTest {
 		assertTrue(vcs.getTagsOnRevision(c2.getRevision()).isEmpty());
 		assertTrue(vcs.getTagsOnRevision(c3.getRevision()).containsAll(Arrays.asList(
 				tag3)));
+	}
+	
+	@Test
+	public void testPruneOnBranchCreate() throws Exception {
+		// create a local branch, push failed
+		RuntimeException eCommon = new RuntimeException("test common exception");
+		Mockito.doThrow(eCommon).when(git).push(Mockito.any(Git.class), Mockito.any(RefSpec.class));
+		try {
+			vcs.createBranch(null, "branch", "branch created");
+			fail();
+		} catch (RuntimeException e) {
+		}
+		
+		Mockito.doCallRealMethod().when(git).push(Mockito.any(Git.class), Mockito.any(RefSpec.class));
+		
+		// expect no EVCSBRanchExists exception
+		vcs.createBranch(null, "branch", "branch created");
+		assertTrue(vcs.getBranches("").contains("branch"));
+	}
+	
+	@Test
+	public void testPruneOnTagCreate() throws Exception {
+		// create a local tag, push failed
+		RuntimeException eCommon = new RuntimeException("test common exception");
+		Mockito.doThrow(eCommon).when(git).push(Mockito.any(Git.class), Mockito.any(RefSpec.class));
+	
+		try {
+			vcs.createTag(null, "tag", "tag desc", null);
+			fail();
+		} catch (RuntimeException e) {
+		}
+		
+		Mockito.doCallRealMethod().when(git).push(Mockito.any(Git.class), Mockito.any(RefSpec.class));
+		
+		// expect no exceptions
+		vcs.createTag(null, "tag", "tag desc", null);
+		assertEquals("tag", vcs.getTags().get(0).getTagName());
 	}
 }
 
