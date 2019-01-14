@@ -26,7 +26,7 @@ Use cases
 # Terms
 - Workspace Home
   - Home local folder of all folders used by vcs-related operations. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
-- Locked Working Copy,
+- Locked Working Copy, LWC
   - Local folder where vcs-related operations are executed. Provides thread- and process-safe repository of working folders. See [scm4j-vcs-api](https://github.com/scm4j/scm4j-vcs-api) for details
 - Test Repository
   - Git repository which is used to execute functional tests
@@ -51,7 +51,7 @@ Use cases
 	Or download release jars from https://github.com/scm4j/scm4j-vcs-git/releases
 - Code snippet
 	```java
-	public static final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "git-workspaces";
+	final String WORKSPACE_DIR = System.getProperty("java.io.tmpdir") + "git-workspaces";
 	IVCSWorkspace workspace = new VCSWorkspace(WORKSPACE_DIR);
 	String repoUrl = "https://github.com/MyUser/MyRepo";
 	IVCSRepositoryWorkspace repoWorkspace = workspace.getVCSRepositoryWorkspace(repoUrl);
@@ -66,13 +66,13 @@ Use cases
 - [JGit](https://eclipse.org/jgit/) is used as framework to work with Git repositories
 - Each vcs operation is executed within a LWC
 - `getLocalGit(IVCSLockedWorkingCopy wc)` method is used to create a Git implementation to execute vcs operations within `wc` Working Copy
-  - If provided LWC is empty then current Test Repository is cloned into this LWC, otherwise existing repository is just switched to required branch
+  - If provided LWC is empty then current Test Repository is cloned into this LWC, otherwise existing repository is just switched to the required branch
 - If `IVCS.setProxy()` is called then provided proxy is used for each url which contains `repoUrl`
 
 # Functional testing
 - New local file-based Test Repository is created before each test and deletes automatically after each test
 - To execute tests just run GitVCSTest class as JUnit test. Tests from VCSAbstractTest class will be executed. See [scm4j-vcs-test](https://github.com/scm4j/scm4j-vcs-test) for details
-- Run `gradle test` to execute tests
+- Or run `gradle test` to execute tests
 
 # Limitations
-- Commit messages can not be attached to branch create and delete operations because Git does not exposes these operations as separate commits
+- Commit messages can not be attached to branch create and delete operations because Git does not expose these operations as separate commits
